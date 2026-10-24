@@ -357,8 +357,8 @@ try {
   check("C joins", text(await ev("C", `return acSync.enterRecoveryPhrase(${JSON.stringify(FOLDER)}, ${JSON.stringify(phrase)})`)) === '{"ok":true}');
   await sync("C", "C", "A", "B", "C");
   await until("three devices to converge", async () => {
-    const [a, c] = await Promise.all([state("A"), state("C")]);
-    return same(a, c) && a.devices.length === 3;
+    const [a, b, c] = await Promise.all([state("A"), state("B"), state("C")]);
+    return same(a, b) && same(a, c) && a.devices.length === 3;
   }, ["A", "B", "C"]);
   const c = await state("C");
   a = await state("A");

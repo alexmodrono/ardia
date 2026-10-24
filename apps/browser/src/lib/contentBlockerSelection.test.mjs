@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import { test } from "node:test";
 
-globalThis.blockerSelectionNative = { listeners: new Set(), select: async () => {} };
-const shell = "data:text/javascript," + encodeURIComponent(`export const confirm = async () => ({confirmed: true});`);
+globalThis.blockerSelectionNative = { listeners: new Set(), select: async () => {}, confirm: async () => ({ confirmed: true }) };
+const shell = "data:text/javascript," + encodeURIComponent(`export const confirm = () => globalThis.blockerSelectionNative.confirm();`);
 const mock = "data:text/javascript," + encodeURIComponent(`
 export const getContentBlocker = async () => ({provider: 'ublock', selectedProvider: 'ublock', clickAds: false, stats: {ready: true}});
 export const setContentBlockerProvider = (provider, consent) => globalThis.blockerSelectionNative.select(provider, consent);
@@ -68,3 +68,32 @@ test("unmounting removes both native and selection notifications", async () => {
   await selectContentBlocker("adnauseam");
   assert.equal(refreshed, 1);
 });
+
+for (const confirmed of [false, true]) {
+  test(`pending consent does not announce activation before ${confirmed ? "confirmation" : "cancellation"}`, async () => {
+    let answer;
+    const seen = [];
+    globalThis.blockerSelectionNative.confirm = () => new Promise(resolve => { answer = resolve; });
+    globalThis.blockerSelectionNative.select = async provider => { seen.push(provider); };
+    const subscription = onBlockerSettingsChange(() => seen.push(getActivatingBlocker() ? "activating" : "refresh"));
+    const selection = selectContentBlocker("adnauseam");
+    try {
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(getActivatingBlocker(), null);
+      assert.deepEqual(seen, []);
+      await assert.rejects(selectContentBlocker("ublock"), /Another content blocker/);
+      answer({ confirmed });
+      assert.equal(await selection, confirmed);
+      assert.deepEqual(seen, confirmed ? ["activating", "adnauseam", "refresh"] : []);
+      assert.equal(getActivatingBlocker(), null);
+      seen.length = 0;
+      assert.equal(await selectContentBlocker("ublock"), true);
+      assert.deepEqual(seen, ["activating", "ublock", "refresh"]);
+    } finally {
+      answer?.({ confirmed: false });
+      await selection.catch(() => {});
+      subscription.remove();
+      globalThis.blockerSelectionNative.confirm = async () => ({ confirmed: true });
+    }
+  });
+}

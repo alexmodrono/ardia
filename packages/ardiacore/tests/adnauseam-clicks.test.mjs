@@ -1,16 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { register } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { grant, revoke, runOnPage } from "./blocker-scripts.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-execFileSync(`${here}../scripts/adnauseam.sh`, { stdio: "inherit" });
 const ext = `${here}../vendor/adnauseam/ext`;
 const core = `${ext}/js/adn/core.js`;
 const vapiBackground = `${ext}/js/vapi-background.js`;
+if (![core, vapiBackground].every(existsSync)) {
+  throw new Error("AdNauseam test dependency is missing. From the repository root, run bash packages/ardiacore/scripts/adnauseam.sh before this test.");
+}
 
 const imports = {};
 for (const file of [core, vapiBackground]) {

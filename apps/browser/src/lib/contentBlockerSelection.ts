@@ -3,6 +3,7 @@ import { confirmAdClicking } from "./contentBlockerConsent";
 
 const listeners = new Set<() => void>();
 let activating: ContentBlockerProvider | null = null;
+let selecting = false;
 
 export const getActivatingBlocker = () => activating;
 const notify = () => {
@@ -10,10 +11,9 @@ const notify = () => {
 };
 
 export async function selectContentBlocker(provider: ContentBlockerProvider, options: { windowId?: string; isCurrent?: () => boolean } = {}) {
-  if (activating) throw new Error("Another content blocker is activating. Please wait.");
-  activating = provider;
+  if (selecting) throw new Error("Another content blocker is being selected. Please wait.");
+  selecting = true;
   try {
-    notify();
     const isCurrent = options.isCurrent ?? (() => true);
     if (!isCurrent()) return false;
     if (provider === "adnauseam") {
@@ -23,11 +23,15 @@ export async function selectContentBlocker(provider: ContentBlockerProvider, opt
       if (!alreadyConsented && !(await confirmAdClicking(options.windowId))) return false;
       if (!isCurrent()) return false;
     }
+    activating = provider;
+    notify();
     await setContentBlockerProvider(provider, provider === "adnauseam");
     return isCurrent();
   } finally {
+    selecting = false;
+    const wasActivating = activating !== null;
     activating = null;
-    notify();
+    if (wasActivating) notify();
   }
 }
 
