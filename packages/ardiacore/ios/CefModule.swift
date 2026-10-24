@@ -125,6 +125,18 @@ public class CefModule: Module {
     AsyncFunction("setContentBlockerAllowed") { (host: String, allowed: Bool, promise: Promise) in
       ArdiaCoreContentBlocker.setAllowed(allowed, host: host) { CefModule.settle(promise, $0) }
     }.runOnQueue(.main)
+    AsyncFunction("setContentBlockerProvider") { (provider: String, clickConsent: Bool, promise: Promise) in
+      ArdiaCoreContentBlocker.setProvider(provider, clickConsent: clickConsent) { CefModule.settle(promise, $0) }
+    }.runOnQueue(.main)
+    AsyncFunction("getPrivacySettings") { (profile: String, origin: String, promise: Promise) in
+      ArdiaCoreContentBlocker.privacyState(profile: profile, origin: origin) { result in
+        if let error = result["error"] as? String { promise.reject("privacy", error) }
+        else { promise.resolve(result) }
+      }
+    }.runOnQueue(.main)
+    AsyncFunction("setPrivacySetting") { (profile: String, key: String, value: Bool, origin: String, promise: Promise) in
+      ArdiaCoreContentBlocker.setPrivacy(key, value: value, profile: profile, origin: origin) { CefModule.settle(promise, $0) }
+    }.runOnQueue(.main)
     AsyncFunction("devContentBlockerFailNextMessage") { ArdiaCoreContentBlocker.devFailNextMessage() }.runOnQueue(.main)
     AsyncFunction("devContentBlockerDelayNextLoad") { (ms: Double) in ArdiaCoreContentBlocker.devDelayNextLoad(ms) }.runOnQueue(.main)
 

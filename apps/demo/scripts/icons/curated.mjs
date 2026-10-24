@@ -1,4 +1,9 @@
 export const CURATED = {
+  shield: "L:shield T:shield P:shield M:shield-outline",
+  "lock.open": "L:lock-open T:lock-open P:lock-open M:lock-open-outline",
+  "checkmark.shield.fill": "PF:shield-check-fill M:shield-check TF:shield-check",
+  "sun.max.fill": "PF:sun-fill TF:sun M:white-balance-sunny",
+  "moon.fill": "PF:moon-fill TF:moon M:moon-waning-crescent",
   pianokeys: "L:piano T:piano P:piano-keys M:piano",
   cursorarrow: "PF:cursor-fill M:cursor-default TF:pointer IS:cursor-pointer",
   gyroscope: "L:orbit T:3d-rotate M:rotate-orbit L:rotate-3d T:rotate-360 L:atom",
