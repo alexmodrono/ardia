@@ -117,7 +117,7 @@ export function PrivacyPane() {
     <View>
       <SectionHeader title="Content blocking" description="uBlock Origin blocks ads and trackers. AdNauseam adds background ad clicking for active obfuscation." />
       <Group>
-        {(blocker?.availableProviders.length ?? 0) > 1 && (
+        {blocker && (blocker.availableProviders.length > 1 || (!blocker.stats.ready && !!blocker.stats.error)) && (
           <Row anchor="privacy.contentBlocker" description={activating ? `Activating ${PROVIDER_TITLES[activating]}…` : providerNote(blocker)}>
             <PopUp
               value={activating ?? blocker!.provider}
@@ -125,6 +125,9 @@ export function PrivacyPane() {
               disabled={busy}
               onChange={(p) => void mutate(() => selectContentBlocker(p))}
             />
+            {!blocker.stats.ready && !!blocker.stats.error && (
+              <Button title="Retry" disabled={busy} onPress={() => void mutate(() => selectContentBlocker(blocker.selectedProvider))} />
+            )}
           </Row>
         )}
         {adNauseam ? (
@@ -143,9 +146,11 @@ export function PrivacyPane() {
           title="Background ad clicking"
           description={!adNauseam
             ? "Off with uBlock Origin. Choose AdNauseam above to opt into active obfuscation."
-            : blocker?.clickAds
+            : blocker?.enabled && blocker.clickAds
               ? "Included with AdNauseam. Uses extra data to simulate clicks and muddy advertising profiles. Switch to uBlock Origin for blocking without clicking."
-              : "Paused because activation or saving failed. Retry to confirm AdNauseam and resume clicking."}
+              : blocker?.clickAds
+                ? "Paused because protection is off."
+                : "Paused because activation or saving failed. Retry to confirm AdNauseam and resume clicking."}
         >
           {adNauseam && !blocker?.clickAds ? (
             <Button title="Retry" disabled={busy} onPress={() => void mutate(() => selectContentBlocker("adnauseam"))} />

@@ -509,6 +509,14 @@ void Call(NSString *profile, NSString *expression, void (^completion)(id value, 
 NSString *const kRead =
     @"Promise.all([lists(), trusted()]).then(([l, t]) => ({lists: selected(l).sort(), whitelist: [...t.whitelist].sort(), autoUpdate: l.autoUpdate !== false}))";
 
+NSString *const kSetEnabled =
+    @"trusted().then((t) => {"
+     "  const on = %@;"
+     "  const kept = t.whitelist.filter((d) => d !== offDirective);"
+     "  if (!on) stopClicks();"
+     "  return send({what: 'setWhitelist', whitelist: (on ? kept : kept.concat([offDirective])).join('\\n')});"
+     "}).then(() => send({what: 'userSettings', name: 'autoUpdate', value: %@}))";
+
 NSString *const kFollow =
     @"Promise.all([lists(), trusted()]).then(([l, t]) => {"
      "  const want = %@;"
@@ -973,6 +981,16 @@ NSDictionary *ProviderState() {
   };
 }
 
+NSDictionary *UnavailableState(NSString *error) {
+  NSMutableDictionary *state = [ProviderState() mutableCopy];
+  [state addEntriesFromDictionary:@{
+    @"enabled" : @NO, @"lists" : @[], @"allowedHosts" : @[],
+    @"stats" : @{@"ready" : @NO, @"enabled" : @NO, @"parseMs" : @0, @"lookups" : @0, @"averageLookupMicros" : @0,
+                 @"maxLookupMicros" : @0, @"error" : error ?: @"unavailable"},
+  }];
+  return state;
+}
+
 void State(void (^completion)(NSDictionary *state)) {
   completion = [completion copy];
   if (gSwitching) {
@@ -980,17 +998,10 @@ void State(void (^completion)(NSDictionary *state)) {
     return;
   }
   if (!gDefaultSettled && ArdiaCoreHost.isStarted) return WhenDefaultSettled(^{ State(completion); });
+  if (gSwitchFailure) return completion(UnavailableState(gSwitchFailure));
   Call(kProfile, kState, ^(NSDictionary *read, NSString *error) {
     if ([error isEqual:kProviderChanged]) return State(completion);
-    if (![read isKindOfClass:NSDictionary.class] || ![read[@"lists"] isKindOfClass:NSArray.class]) {
-      NSMutableDictionary *state = [ProviderState() mutableCopy];
-      [state addEntriesFromDictionary:@{
-        @"enabled" : @NO, @"lists" : @[], @"allowedHosts" : @[],
-        @"stats" : @{@"ready" : @NO, @"enabled" : @NO, @"parseMs" : @0, @"lookups" : @0, @"averageLookupMicros" : @0,
-                     @"maxLookupMicros" : @0, @"error" : error ?: @"unavailable"},
-      }];
-      return completion(state);
-    }
+    if (![read isKindOfClass:NSDictionary.class] || ![read[@"lists"] isKindOfClass:NSArray.class]) return completion(UnavailableState(error));
     NSMutableArray *lists = [NSMutableArray array];
     for (NSDictionary *l in read[@"lists"]) {
       if (![l isKindOfClass:NSDictionary.class] || ![l[@"id"] isKindOfClass:NSString.class]) continue;
@@ -1075,14 +1086,11 @@ void ActivateProvider(NSString *provider, NSArray<NSString *> *profiles, void (^
     }
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
       if (failed) return done(failed);
-      FollowDefault(profiles, ^(NSString *followError) {
-        if (followError) return done(followError);
-        ApplyClicks(LoadedProfiles().array, false, gClickIntent, ^(NSString *clickError) {
-          if (clickError) return done(clickError);
-          Call(kProfile, kRead, ^(NSDictionary *settings, NSString *readError) {
-            if (!readError) gBlockingOffIntent = [settings[@"whitelist"] containsObject:kOffDirective];
-            done(readError);
-          });
+      Call(kProfile, ScriptWith(kSetEnabled, @[ @(!gBlockingOffIntent), @(!gBlockingOffIntent) ]), ^(id, NSString *enabledError) {
+        if (enabledError) return done(enabledError);
+        FollowDefault(profiles, ^(NSString *followError) {
+          if (followError) return done(followError);
+          ApplyClicks(LoadedProfiles().array, false, gClickIntent, done);
         });
       });
     });
@@ -1116,8 +1124,14 @@ void SwitchProvider(NSString *provider, void (^done)(NSString *error)) {
   if (!gDefaultSettled) return WhenDefaultSettled(^{ SwitchProvider(provider, done); });
   const bool clicking = [provider isEqual:kAdNauseam];
   if ([provider isEqual:gProvider] && [provider isEqual:SelectedProvider()] && ClickConsent() == clicking && !gSwitchFailure) return done(nil);
+  const bool recovering = gSwitchFailure != nil;
   ForgetGoneProfiles();
-  NSArray<NSString *> *profiles = [LoadedProfiles().array copy];
+  NSMutableOrderedSet<NSString *> *candidates = [LoadedProfiles() mutableCopy];
+  if (recovering) {
+    for (NSString *profile in ardiacore_host::LoadedProfileNames())
+      if (!ardiacore_host::IsIncognito(profile) && !ardiacore_host::IsDeletedProfile(profile)) [candidates addObject:profile];
+  }
+  NSArray<NSString *> *profiles = candidates.array;
   if (![profiles containsObject:kProfile]) return done(@"the current content blocker isn't loaded; try again");
   for (NSString *profile in profiles) {
     if (![ardiacore_host::LoadedProfile(profile) respondsToSelector:@selector(unloadComponentExtension:)])
@@ -1125,7 +1139,6 @@ void SwitchProvider(NSString *provider, void (^done)(NSString *error)) {
   }
   done = [done copy];
   gSwitching = true;
-  gSwitchFailure = nil;
   gClickConsent = @NO;
   const NSUInteger token = ++gClickIntent;
   if (NSString *error = SavePreferences(kUBlock, false)) {
@@ -1152,20 +1165,30 @@ void SwitchProvider(NSString *provider, void (^done)(NSString *error)) {
           gSwitchFailure = restoreError;
           NSString *message = [NSString stringWithFormat:@"Couldn't activate %@: %@. %@%@", clicking ? @"AdNauseam" : @"uBlock Origin", error,
                                 restoreError ? [@"uBlock Origin could not be restored: " stringByAppendingString:restoreError]
-                                             : @"uBlock Origin is active. Ad clicking is off.",
+                                             : gBlockingOffIntent ? @"uBlock Origin is loaded with protection paused. Ad clicking is off."
+                                                                  : @"uBlock Origin is active. Ad clicking is off.",
                                 saveError ? [@" The fallback could not be saved: " stringByAppendingString:saveError] : @""];
           FinishProviderSwitch(profiles, message, done);
         });
       });
     };
-    ActivateProvider(provider, profiles, ^(NSString *activationError) {
-      NSString *error = activationError ?: SavePreferences(provider, clicking);
-      if (error) return restore(error);
-      gClickConsent = @(clicking);
-      ApplyClicks(LoadedProfiles().array, clicking, token, ^(NSString *clickError) {
-        if (clickError) return restore(clickError);
-        FinishProviderSwitch(profiles, nil, done);
+    void (^activate)(void) = ^{
+      ActivateProvider(provider, profiles, ^(NSString *activationError) {
+        NSString *error = activationError ?: SavePreferences(provider, clicking);
+        if (error) return restore(error);
+        gClickConsent = @(clicking);
+        ApplyClicks(LoadedProfiles().array, clicking, token, ^(NSString *clickError) {
+          if (clickError) return restore(clickError);
+          gSwitchFailure = nil;
+          FinishProviderSwitch(profiles, nil, done);
+        });
       });
+    };
+    if (recovering) return activate();
+    Call(kProfile, kRead, ^(NSDictionary *settings, NSString *readError) {
+      if (readError) return FinishProviderSwitch(profiles, [@"Couldn't read the current blocker's protection setting: " stringByAppendingString:readError], done);
+      gBlockingOffIntent = gBlockingOffIntent || [settings[@"whitelist"] containsObject:kOffDirective];
+      activate();
     });
   });
 }
@@ -1190,12 +1213,6 @@ void LoadContentBlocker(NSString *profile) {
 
 + (void)setEnabled:(BOOL)enabled completion:(void (^)(NSString *))completion {
   if (gSwitching) return completion(@"the content blocker is activating");
-  NSString *script = @"trusted().then((t) => {"
-                      "  const on = %@;"
-                      "  const kept = t.whitelist.filter((d) => d !== offDirective);"
-                      "  if (!on) stopClicks();"
-                      "  return send({what: 'setWhitelist', whitelist: (on ? kept : kept.concat([offDirective])).join('\\n')});"
-                      "}).then(() => send({what: 'userSettings', name: 'autoUpdate', value: %@}))";
   completion = [completion copy];
   const NSUInteger token = ++gClickIntent;
   gBlockingOffIntent = !enabled;
@@ -1205,7 +1222,7 @@ void LoadContentBlocker(NSString *profile) {
     failed = failed ?: error;
     if (--pending == 0) completion(failed);
   };
-  Call(kProfile, ScriptWith(script, @[ @(enabled), @(enabled) ]), ^(id, NSString *error) { Changed(error, settled); });
+  Call(kProfile, ScriptWith(kSetEnabled, @[ @(enabled), @(enabled) ]), ^(id, NSString *error) { Changed(error, settled); });
   if (enabled) return settled(nil);
   StopClicksNow(LoadedProfiles().array, token, settled);
 }

@@ -4623,9 +4623,9 @@ try {
       const early = await cef(`setContentBlockerProvider("adnauseam", false)`).then(() => "accepted", (e) => String(e));
       if (early === "accepted") throw new Error("AdNauseam activated without clicking consent");
       await cef(`devContentBlockerFailNextMessage()`);
-      const activationFailure = await cef(`setContentBlockerProvider("adnauseam", true)`).then(() => "accepted", e => String(e));
-      if (!activationFailure.includes("uBlock Origin is active") || (await ready()).provider !== "ublock" || JSON.stringify(await running()) !== JSON.stringify([ublock]))
-        throw new Error(`activation did not restore uBlock Origin: ${activationFailure}`);
+      const readFailure = await cef(`setContentBlockerProvider("adnauseam", true)`).then(() => "accepted", e => String(e));
+      if (!readFailure.includes("Couldn't read the current blocker's protection setting") || (await ready()).provider !== "ublock" || JSON.stringify(await running()) !== JSON.stringify([ublock]))
+        throw new Error(`a failed settings read changed the running blocker: ${readFailure}`);
       await cef(`setContentBlockerProvider("adnauseam", true)`);
       const switched = await ready();
       const runningAdNauseam = await running();
