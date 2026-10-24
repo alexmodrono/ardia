@@ -1,4 +1,9 @@
 export const CURATED = {
+  bold: "L:bold T:bold P:text-b M:format-bold",
+  "doc.text.fill": "PF:file-text M:file-document",
+  "envelope.fill": "PF:envelope-simple PF:envelope M:email TF:mail",
+  "map.fill": "PF:map-trifold M:map",
+  "square.stack.fill": "PF:stack-simple M:layers TF:stack",
   shield: "L:shield T:shield P:shield M:shield-outline",
   "lock.open": "L:lock-open T:lock-open P:lock-open M:lock-open-outline",
   "checkmark.shield.fill": "PF:shield-check-fill M:shield-check TF:shield-check",
