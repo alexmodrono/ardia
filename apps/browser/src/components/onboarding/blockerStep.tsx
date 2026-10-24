@@ -126,7 +126,7 @@ export function BlockerStep() {
       <Reveal delay={140} style={{ gap: 12 }}>
         {saveError ? <Text style={{ fontSize: 12, lineHeight: 17, color: colors.title }}>{saveError}</Text> : null}
         {options.length ? (
-          <View accessibilityRole="radiogroup" style={{ gap: 6 }}>
+          <View accessibilityRole="radiogroup" accessibilityLabel="Ad blocker" style={{ gap: 6 }}>
             {options.map((p) => (
               <CheckRow
                 key={p}

@@ -92,9 +92,10 @@ test("replaying setup preserves consent without another confirmation", async () 
 
 test("a legacy or failed AdNauseam choice with clicking off requires confirmation", async () => {
   state = { ...state, provider: "adnauseam", selectedProvider: "adnauseam", clickAds: false };
-  confirm = async () => ({ confirmed: false });
+  confirm = async options => { calls.push(["confirm", options]); return { confirmed: false }; };
   assert.equal(await applyOnboardingBlocker("adnauseam", active), false);
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls.map(call => call[0]), ["confirm"]);
+  assert.equal(state.clickAds, false);
 });
 
 test("returning to uBlock clears clicking consent without a confirmation", async () => {

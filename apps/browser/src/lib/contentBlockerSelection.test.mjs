@@ -36,6 +36,8 @@ test("other screens see activation progress and overlapping switches are rejecte
     assert.equal(getActivatingBlocker(), "adnauseam");
     await assert.rejects(selectContentBlocker("ublock"), /Another content blocker/);
     assert.equal(getActivatingBlocker(), "adnauseam");
+    for (const listener of globalThis.blockerSelectionNative.listeners) listener();
+    assert.deepEqual(seen, ["activating", "adnauseam"]);
     complete();
     await saving;
     assert.deepEqual(seen, ["activating", "adnauseam", "refresh"]);

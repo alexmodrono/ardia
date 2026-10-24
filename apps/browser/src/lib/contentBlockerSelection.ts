@@ -33,7 +33,9 @@ export async function selectContentBlocker(provider: ContentBlockerProvider, opt
 
 export function onBlockerSettingsChange(listener: () => void) {
   listeners.add(listener);
-  const native = onContentBlockerChange(listener);
+  const native = onContentBlockerChange(() => {
+    if (!activating) listener();
+  });
   return {
     remove() {
       listeners.delete(listener);

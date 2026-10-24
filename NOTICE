@@ -22,7 +22,7 @@ Ardia builds on and ships third-party software under its own licenses, including
 - Chromium Embedded Framework (BSD-3-Clause): a few of its patches to Chromium
 - uBlock Origin (GPL-3.0), bundled as a separate extension with the small patches in packages/ardiacore/scripts/ubo.sh
 - AdNauseam (GPL-3.0), copyright Daniel C. Howe and contributors, https://github.com/dhowe/AdNauseam: bundled as a
-  separate extension, off unless chosen in Settings › Privacy, from its v3.29.2 Chromium release with the small patches
+  separate extension, off unless chosen during onboarding or in Settings › Privacy, from its v3.29.2 Chromium release with the small patches
   in packages/ardiacore/scripts/adnauseam.sh; its source as shipped is the unpacked extension in
   Ardia.app/Contents/Resources/Extensions/adnauseam
 - Sparkle (MIT)

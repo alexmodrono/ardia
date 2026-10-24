@@ -263,6 +263,7 @@ NSString *ExtensionPath() {
 
 void FollowDefault(NSArray<NSString *> *profiles, void (^done)(NSString *error));
 void WhenDefaultSettled(void (^then)(void));
+void RestoreClicksAfterBackgroundLoad(NSString *profile, NSUInteger generation);
 
 void LoadIntoProfile(NSString *profile, void (^then)(NSString *error)) {
   then = [then copy];
@@ -275,6 +276,11 @@ void LoadIntoProfile(NSString *profile, void (^then)(NSString *error)) {
       if ([LoadedProfiles() containsObject:profile]) return then(nil);
       NSString *path = gExtensionPath;
       if (!p || !path || ![p respondsToSelector:@selector(loadComponentExtension:)]) return then(@"not loaded");
+      if ([p respondsToSelector:@selector(watchComponentExtensionBackground:onLoad:)]) {
+        void (^onLoad)(void) = nil;
+        if (UsesAdNauseam()) onLoad = ^{ RestoreClicksAfterBackgroundLoad(profile, generation); };
+        [p watchComponentExtensionBackground:kAdNauseamId onLoad:onLoad];
+      }
       NSString *loaded = [p loadComponentExtension:path];
       if (![loaded isEqualToString:ExtensionId()]) {
         NSLog(@"[blocker] component load failed (%@)", loaded);
@@ -308,6 +314,7 @@ NSString *const kPrelude =
      "const offDirective = %@;"
      "const extensionOrigin = %@;"
      "const blockerName = %@;"
+     "const backgroundDocument = chrome.extension.getBackgroundPage()?.document;"
      "const deadline = Date.now() + %@;"
      "const left = () => Math.max(0, deadline - Date.now());"
      "let expired = false;"
@@ -417,7 +424,7 @@ void Finish(ACContentBlockerOp *op, id value, NSString *error) {
 
 bool Retriable(NSString *error, ACContentBlockerPage *page) {
   if (!page.onOwnPage) return true;
-  for (NSString *sign in @[ @"no reply", @"no answer", @"context invalidated", @"not the extension page", @"renderer ", @"closed" ])
+  for (NSString *sign in @[ @"no reply", @"no answer", @"context invalidated", @"not the extension page", @"background restarted", @"renderer ", @"closed" ])
     if ([error containsString:sign]) return true;
   return false;
 }
@@ -512,7 +519,10 @@ NSString *const kClicks =
      "  const [consent, token] = [%@, %@];"
      "  const background = chrome.extension.getBackgroundPage();"
      "  if (typeof background?.ardiaStopClicks !== 'function') throw new Error('AdNauseam has no click switch');"
-     "  const current = () => token >= (background.ardiaClickToken ?? 0);"
+     "  const current = () => {"
+     "    if (chrome.extension.getBackgroundPage()?.document !== backgroundDocument) throw new Error('AdNauseam background restarted');"
+     "    return token >= (background.ardiaClickToken ?? 0);"
+     "  };"
      "  if (!current()) return null;"
      "  const allowed = consent && !t.whitelist.includes(offDirective);"
      "  if (!allowed) {"
@@ -575,6 +585,11 @@ void StopClicksNow(NSArray<NSString *> *profiles, NSUInteger token, void (^done)
   dispatch_group_t group = dispatch_group_create();
   __block NSString *failed;
   for (NSString *profile in profiles) {
+    ACContentBlockerOp *pending = Queues()[profile].firstObject;
+    if (pending.clickIntent && pending.clickIntent.unsignedIntegerValue != token) {
+      [Pages()[profile] fail:@"ad clicking intent changed; closed"];
+      [Pages() removeObjectForKey:profile];
+    }
     dispatch_group_enter(group);
     RevokeOnOwnPage(profile, script, ^(NSString *error) {
       failed = failed ?: error;
@@ -608,6 +623,25 @@ void LogClicksError(NSString *error) {
 void ApplyConsentedClicks(NSArray<NSString *> *profiles) {
   if (!UsesAdNauseam() || !ClickConsent() || gBlockingOffIntent) return;
   ApplyClicks(profiles, true, gClickIntent, ^(NSString *error) { LogClicksError(error); });
+}
+
+void RestoreClicksAfterBackgroundLoad(NSString *profile, NSUInteger generation) {
+  const NSUInteger token = gClickIntent;
+  bool (^current)(void) = ^{
+    return generation == gProviderGeneration && token == gClickIntent && !gSwitching &&
+           UsesAdNauseam() && ClickConsent() && !gBlockingOffIntent &&
+           [LoadedProfiles() containsObject:profile] && ardiacore_host::LoadedProfile(profile) &&
+           !ardiacore_host::IsDeletedProfile(profile);
+  };
+  if (!current()) return;
+  WhenDefaultSettled(^{
+    if (!current()) return;
+    if (!profile.length) return ApplyConsentedClicks(@[ profile ]);
+    FollowDefault(@[ profile ], ^(NSString *error) {
+      if (error) return LogClicksError(error);
+      if (current()) ApplyConsentedClicks(@[ profile ]);
+    });
+  });
 }
 
 void RevokeClicks(NSUInteger token, void (^done)(NSString *error)) {

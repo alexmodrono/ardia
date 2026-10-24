@@ -30,7 +30,7 @@ export const offDirective = "/^(?:ardia-blocking-off|)/";
 export function runOnPage(script, { background, send = () => Promise.reject(new Error("send isn't available")), storage = {} }) {
   return new Promise((resolve) => {
     const chrome = {
-      extension: { getBackgroundPage: () => background },
+      extension: { getBackgroundPage: () => typeof background === "function" ? background() : background },
       runtime: {},
       storage: {
         local: {

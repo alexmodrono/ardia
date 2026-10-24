@@ -120,7 +120,7 @@ export function PrivacyPane() {
         {(blocker?.availableProviders.length ?? 0) > 1 && (
           <Row anchor="privacy.contentBlocker" description={activating ? `Activating ${PROVIDER_TITLES[activating]}…` : providerNote(blocker)}>
             <PopUp
-              value={activating ?? blocker!.selectedProvider}
+              value={activating ?? blocker!.provider}
               options={blocker!.availableProviders.map((p) => ({ value: p, title: PROVIDER_TITLES[p] }))}
               disabled={busy}
               onChange={(p) => void mutate(() => selectContentBlocker(p))}
@@ -138,15 +138,19 @@ export function PrivacyPane() {
             </Row>
           ))
         )}
-        {adNauseam && (
-          <Row
-            anchor="privacy.clickAds"
-            title="Background ad clicking"
-            description={blocker?.clickAds
+        <Row
+          anchor="privacy.clickAds"
+          title="Background ad clicking"
+          description={!adNauseam
+            ? "Off with uBlock Origin. Choose AdNauseam above to opt into active obfuscation."
+            : blocker?.clickAds
               ? "Included with AdNauseam. Uses extra data to simulate clicks and muddy advertising profiles. Switch to uBlock Origin for blocking without clicking."
-              : "Paused because activation or saving failed. Choose a blocker again to finish switching."}
-          />
-        )}
+              : "Paused because activation or saving failed. Retry to confirm AdNauseam and resume clicking."}
+        >
+          {adNauseam && !blocker?.clickAds ? (
+            <Button title="Retry" disabled={busy} onPress={() => void mutate(() => selectContentBlocker("adnauseam"))} />
+          ) : null}
+        </Row>
         {!adNauseam && (
           <Row anchor="privacy.filterLists">
             <Button title="Advanced…" disabled={!blocker || busy} onPress={() => showSettingsSheet(<FilterListsSheet />)} />

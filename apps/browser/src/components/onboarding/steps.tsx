@@ -486,7 +486,7 @@ export function OutroStep() {
         {reminder ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6 }}>
             <View style={{ minWidth: 38, alignItems: "center" }}>
-              <Symbol name="checkmark.circle" size={13} color={colors.title} style={{ width: 16, height: 16 }} />
+              <Symbol name={blocker?.stats.ready && blocker.enabled && blocker.provider === blocker.selectedProvider ? "checkmark.circle" : "info.circle"} size={13} color={colors.title} style={{ width: 16, height: 16 }} />
             </View>
             <Text style={{ flex: 1, fontSize: 12, lineHeight: 17, color: colors.subtitle }}>{reminder}</Text>
           </View>

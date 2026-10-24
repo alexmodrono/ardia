@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { grant, offDirective, revoke, runOnPage } from "./blocker-scripts.mjs";
 
 const background = (extra = {}) => ({
+  document: {},
   µBlock: { isReadyPromise: Promise.resolve() },
   ardiaClickConsent: false,
   stops: 0,
@@ -53,6 +54,54 @@ test("a grant queued before a revoke can't reopen the switch when it runs later"
   await runOnPage(revoke(1), { background: b });
   await runOnPage(grant(true, 0), { background: b, send: dashboard() });
   assert.equal(b.ardiaClickConsent, false);
+});
+
+test("a grant waiting on the whitelist cannot cross a background reload after revocation", async () => {
+  let b = background();
+  let answer;
+  const granting = runOnPage(grant(true, 1), {
+    background: () => b,
+    send: (message) => message.what === "getWhitelist"
+      ? new Promise((resolve) => { answer = resolve; })
+      : Promise.resolve({}),
+  });
+  while (!answer) await new Promise((r) => setImmediate(r));
+  await runOnPage(revoke(2), { background: b });
+  b = background();
+  answer({ whitelist: [] });
+  const result = await granting;
+  assert.equal(b.ardiaClickConsent, false);
+  assert.match(result.error, /background restarted/);
+});
+
+test("a grant's delayed settings answer cannot enable a replacement document in the same window", async () => {
+  const b = background();
+  let answer;
+  const granting = runOnPage(grant(true, 1), {
+    background: b,
+    send: dashboard({ userSettings: () => new Promise((resolve) => { answer = resolve; }) }),
+  });
+  while (!answer) await new Promise((r) => setImmediate(r));
+  await runOnPage(revoke(2), { background: b });
+  Object.assign(b, background());
+  delete b.ardiaClickToken;
+  answer({});
+  const result = await granting;
+  assert.equal(b.ardiaClickConsent, false);
+  assert.match(result.error, /background restarted/);
+});
+
+test("a grant waiting for startup cannot follow a restarted background", async () => {
+  let ready;
+  let b = background({ µBlock: { isReadyPromise: new Promise((resolve) => { ready = resolve; }) } });
+  const granting = runOnPage(grant(true, 1), { background: () => b, send: dashboard() });
+  await new Promise((resolve) => setImmediate(resolve));
+  await runOnPage(revoke(2), { background: b });
+  b = background();
+  ready();
+  const result = await granting;
+  assert.equal(b.ardiaClickConsent, false);
+  assert.match(result.error, /background restarted/);
 });
 
 test("a grant made after the revoke opens it, and sets clickingAds", async () => {

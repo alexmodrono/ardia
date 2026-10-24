@@ -98,9 +98,16 @@ Object.assign(globalThis, {
     type: (v) => typeof v,
     domainFromHostname: (h) => h.split(".").slice(-2).join("."),
     hostnameFromURI: (u) => new URL(u).hostname,
+    computeHash: (a) => a.targetUrl,
+    unescapeHTML: (s) => s,
   },
   defaults: {
-    "background.js": { userSettings, hiddenSettings: {}, pageStoreFromTabId: () => null },
+    "background.js": {
+      userSettings,
+      hiddenSettings: { internalLinkDomains: [] },
+      pageStoreFromTabId: () => null,
+      changeUserSettings: (key, value) => { userSettings[key] = value; },
+    },
     "dnt.js": { mustNotVisit: () => false },
     "webext.js": new Proxy(
       { storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {}, clear: async () => {} } } },
@@ -178,15 +185,25 @@ test("ads from private windows are never visited, and never registered", async (
   await poll();
   assert.equal(sent.length, 0, "the stored private ad");
 
-  const register = (sender, extra = {}) => {
-    warnings.length = 0;
-    listener({ what: "registerAd", ad: ad(3, extra) }, sender, () => {});
-    return warnings.some((w) => w.startsWith("[REGISTER]"));
-  };
-  assert.equal(register({ tabId: 7, ardiaIncognito: true }), false, "a private tab");
-  assert.equal(register({ tabId: 7 }, { private: true }), false, "an ad the page marked private");
-  assert.equal(register({ tabId: 7 }), true, "a normal tab reaches registerAd");
-  assert.ok(adnauseam.adlist().every((a) => a.id !== 3));
+  const background = defaults["background.js"];
+  const oldPageStore = background.pageStoreFromTabId;
+  const pageUrl = "https://news.example.org/registration-test";
+  background.pageStoreFromTabId = () => ({ rawURL: pageUrl, title: "Test page", tabHostname: "news.example.org" });
+  const register = (id, sender, extra = {}) => listener({ what: "registerAd", ad: ad(id, {
+    contentData: { src: "https://ads.example.com/banner.png" }, ...extra,
+  }) }, sender, () => {});
+  try {
+    register(3, { tabId: 7, ardiaIncognito: true });
+    register(4, { tabId: 7 }, { private: true });
+    register(5, { tabId: 7 });
+    const targets = adnauseam.adlist().map(a => a.targetUrl);
+    assert.ok(!targets.includes(ad(3).targetUrl), "a private tab's ad is not stored");
+    assert.ok(!targets.includes(ad(4).targetUrl), "an ad marked private is not stored");
+    assert.ok(targets.includes(ad(5).targetUrl), "a normal tab's ad is stored");
+  } finally {
+    background.pageStoreFromTabId = oldPageStore;
+    delete admap[pageUrl];
+  }
 });
 
 test("Ardia's revoke stops the real switch while a target is being verified, and a stale grant can't reopen it", async () => {

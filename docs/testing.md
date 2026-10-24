@@ -1,15 +1,15 @@
 # Testing
 
-`pnpm test` at the root runs every unit test (333 cases, 2026-10-12). Turbo caches the results; a cold run spends most
+`pnpm test` at the root runs the package unit suites below, including the AdNauseam consent tests. Turbo caches the results; a cold run spends most
 of its time in `swift test`'s first build. Each package also runs its own:
 
 | Package | Command | Cases |
 | --- | --- | --- |
-| `apps/browser` | `pnpm --filter @ardia/browser test` | 228 |
-| `packages/core` | `pnpm --filter @ardia/core test` | 32 |
-| `packages/sync` | `pnpm --filter @ardia/sync test` (`swift test`, `node --test`, then the rename's launch migration end to end, `scripts/legacy-migration-e2e.mjs`) | 66 + 9 |
-| `packages/import` | `pnpm --filter @ardia/import test` (`swift test`) | 26 |
-| `packages/ardiacore` | `pnpm --filter @ardia/ardiacore test` (`tests/pip-zoom.test.cc`, compiled with `clang++`; then `tests/content-blocker-clicks.test.mjs`, which runs the content blocker's own page scripts from `ArdiaCoreContentBlocker.mm` on stubs) | 1 program + 11 |
+| `apps/browser` | `pnpm --filter @ardia/browser test` | 626 |
+| `packages/core` | `pnpm --filter @ardia/core test` | 65 |
+| `packages/sync` | `pnpm --filter @ardia/sync test` (`swift test`, `node --test`, then the rename's launch migration end to end, `scripts/legacy-migration-e2e.mjs`) | 66 + 34 |
+| `packages/import` | `pnpm --filter @ardia/import test` (`swift test`) | 32 |
+| `packages/ardiacore` | `pnpm --filter @ardia/ardiacore test` (`tests/pip-zoom.test.cc` and `tests/pip-throw.test.cc`, compiled with `clang++`; then `tests/content-blocker-clicks.test.mjs`, which runs the content blocker's own page scripts from `ArdiaCoreContentBlocker.mm` on stubs, plus `tests/adnauseam-clicks.test.mjs`) | 2 programs + 21 |
 | AdNauseam's click switch | `node --test packages/ardiacore/tests/adnauseam-clicks.test.mjs` (fetches and patches the pinned AdNauseam with `adnauseam.sh` first, then runs its patched `core.js` and `vapi-background.js` on stubs, with Ardia's own revoke and grant scripts) | 7 |
 | `extras/raycast-ardia` | `node --test extras/raycast-ardia/src/scripts.test.ts` | 1 |
 
