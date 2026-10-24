@@ -4534,6 +4534,93 @@ try {
     return { restored: tab.url, loadedAfterMs, racedAtLaunch, nextDocuments: documents };
   });
 
+  await check("content-blocker-provider", async () => {
+    const ublock = "fajbdaomknpkicfjcpipdmcpoamdmilh", adnauseam = "kmggppiioddbnikpjfodfabgmboeihij";
+    const ready = () => until("the blocker's state", async () => {
+      const s = await cef(`getContentBlocker()`);
+      return s?.stats?.ready ? s : null;
+    }, 30000);
+    const running = async () => [...new Set((await targets()).filter((t) => t.type === "background_page").map((t) => t.url.split("/")[2]).filter((id) => id === ublock || id === adnauseam))];
+    const restart = async (log) => {
+      await pressQuit(mainWindow ?? (await appUp(`${log}-up.out.log`)));
+      await until("the app to exit", async () => exited, 20000);
+      await appUp(`${log}.out.log`);
+      return ready();
+    };
+    const gate = async () => {
+      const target = (await targets()).find((t) => t.type === "background_page" && t.url.startsWith(`chrome-extension://${adnauseam}/`));
+      const r = await cdp(target, "Runtime.evaluate", { expression: "[self.ardiaClickConsent, µBlock.userSettings.clickingAds]", returnByValue: true });
+      return r.result.value;
+    };
+    const expectGate = (want, what) => until(what, async () => (JSON.stringify(await gate()) === JSON.stringify(want) ? true : null), 15000);
+    await appUp("app-provider.out.log");
+    const first = await ready();
+    const expectedBackgrounds = (await targets()).filter(t => t.type === "background_page" && t.url.startsWith(`chrome-extension://${ublock}/`)).length;
+    if (first.provider !== "ublock" || first.selectedProvider !== "ublock" || first.clickAds) throw new Error(`not uBlock Origin by default: ${JSON.stringify(first)}`);
+    if (!first.availableProviders.includes("adnauseam")) throw new Error("AdNauseam isn't in the app");
+    await cef(`setContentBlockerAllowed("kept-by-ublock.test", true)`);
+    const bogus = await cef(`setContentBlockerProvider("ublock-lite-settings", false)`).then(() => "accepted", (e) => String(e));
+    if (bogus === "accepted" || (await ready()).selectedProvider !== "ublock") throw new Error(`an unknown blocker was accepted: ${bogus}`);
+    const early = await cef(`setContentBlockerProvider("adnauseam", false)`).then(() => "accepted", (e) => String(e));
+    if (early === "accepted") throw new Error("AdNauseam activated without clicking consent");
+    await cef(`devContentBlockerFailNextMessage()`);
+    const activationFailure = await cef(`setContentBlockerProvider("adnauseam", true)`).then(() => "accepted", e => String(e));
+    if (!activationFailure.includes("uBlock Origin is active") || (await ready()).provider !== "ublock" || JSON.stringify(await running()) !== JSON.stringify([ublock]))
+      throw new Error(`activation did not restore uBlock Origin: ${activationFailure}`);
+    await cef(`setContentBlockerProvider("adnauseam", true)`);
+    const switched = await ready();
+    const runningAdNauseam = await running();
+    if (switched.provider !== "adnauseam" || switched.selectedProvider !== "adnauseam" || !switched.clickAds || !switched.version.startsWith("3.29.2")) throw new Error(`after activation: ${JSON.stringify(switched)}`);
+    if (JSON.stringify(runningAdNauseam) !== JSON.stringify([adnauseam])) throw new Error(`running: ${runningAdNauseam}`);
+    const activeBackgrounds = (await targets()).filter(t => t.type === "background_page" && t.url.startsWith(`chrome-extension://${adnauseam}/`)).length;
+    if (activeBackgrounds !== expectedBackgrounds) throw new Error(`only ${activeBackgrounds} of ${expectedBackgrounds} profiles switched`);
+    if (await cef(`isContentBlockerAllowed("kept-by-ublock.test")`)) throw new Error("AdNauseam shares uBlock Origin's storage");
+    if (switched.allowedHosts.some((host) => host.endsWith("-scheme"))) throw new Error("internal scheme exemptions shown as sites without blocking");
+    await expectGate([true, true], "clicking included in confirmed AdNauseam activation");
+    if (await evalApp(`return typeof globalThis.expo.modules.ArdiaCEF.setContentBlockerClickAds !== 'undefined'`)) throw new Error("independent clicking API still exposed");
+    await cef(`setContentBlockerEnabled(false)`);
+    await expectGate([false, true], "clicking paused while blocking is off");
+    await cef(`setContentBlockerEnabled(true)`);
+    await expectGate([true, true], "clicking back with blocking");
+    const both = (a, b) => evalApp(`const m = globalThis.expo.modules.ArdiaCEF; return Promise.all([m.${a}, m.${b}]).then(() => true)`);
+    await both("setContentBlockerEnabled(false)", "setContentBlockerEnabled(true)");
+    if (!(await ready()).enabled) throw new Error("an older Turn Off overwrote the Turn On right after it");
+    await expectGate([true, true], "the later Turn On wins");
+    const preferences = join(data, "Chromium", "Content Blocker.json");
+    execFileSync("chflags", ["uchg", preferences]);
+    let failedSave;
+    try {
+      failedSave = await cef(`setContentBlockerProvider("ublock", false)`).then(() => "saved", (e) => String(e));
+      await expectGate([false, false], "clicking off though the save failed");
+      if ((await ready()).clickAds) throw new Error("the failed save left consent on");
+      await cef(`setContentBlockerAllowed("after-failed-save.test", true)`);
+      await cef(`setContentBlockerAllowed("after-failed-save.test", false)`);
+      await sleep(1000);
+      await expectGate([false, false], "a settings change after the failed save doesn't grant again");
+    } finally {
+      execFileSync("chflags", ["nouchg", preferences]);
+    }
+    if (failedSave === "saved") throw new Error("the failed save wasn't reported");
+    await cef(`setContentBlockerProvider("adnauseam", true)`);
+    await cef(`setContentBlockerProvider("ublock", false)`);
+    const back = await ready();
+    if (back.clickAds) throw new Error("the consent outlived the switch");
+    const runningUBlock = await running();
+    const kept = await cef(`isContentBlockerAllowed("kept-by-ublock.test")`);
+    await cef(`setContentBlockerAllowed("kept-by-ublock.test", false)`);
+    if (back.provider !== "ublock" || JSON.stringify(runningUBlock) !== JSON.stringify([ublock])) throw new Error(`back: ${back.provider}, running ${runningUBlock}`);
+    if (!kept) throw new Error("uBlock Origin lost its sites without blocking");
+    const overlapping = await evalApp(`const m = globalThis.expo.modules.ArdiaCEF; return Promise.allSettled([
+      m.setContentBlockerProvider('adnauseam', true), m.setContentBlockerProvider('ublock', false), m.setContentBlockerAllowed('during-switch.test', true)
+    ]).then(results => results.map(r => r.status))`, 60000);
+    if (JSON.stringify(overlapping) !== JSON.stringify(["fulfilled", "rejected", "rejected"]) || !(await ready()).clickAds)
+      throw new Error(`overlapping activation was not guarded: ${JSON.stringify(overlapping)}`);
+    await cef(`setContentBlockerProvider("ublock", false)`);
+    const persisted = await restart("app-provider-persisted");
+    if (persisted.provider !== "ublock" || persisted.clickAds) throw new Error("the live choice did not persist");
+    return { adnauseam: switched.version, ublock: back.version, early };
+  });
+
   await check("closed-tabs-own-lists", async () => {
     let windowId = await appUp("app-closed-tabs.out.log");
     const s = (expr) => evalApp(`const s = ac.store.getState(); return ${expr}`);
