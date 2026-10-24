@@ -69,7 +69,7 @@ const needs = {
   "tab-keys-from-page": ["open-url", "target-blank"],
   "window-close": ["window-open"],
   "site-data-clear": ["open-url"],
-  "frozen": ["open-url", "cmd-click"],
+  "frozen": ["open-url"],
   "discard": ["open-url", "cmd-click"],
   "duplicate-and-reopen": ["open-url", "navigate-back-forward-reload"],
   "context-menu-activation-log": ["context-menu-search"],
@@ -4009,20 +4009,25 @@ try {
   });
 
   await check("frozen", async () => {
-    const s = await state();
-    const other = s.tabs.find((x) => x.id !== first.id && x.id !== s.active && x.url?.startsWith(`${base}/d`));
-    if (!other) throw new Error("no background tab");
-    const t = await pageTarget(`${base}/d`);
-    await cdp(t, "Runtime.evaluate", { expression: "window.__life = []; document.addEventListener('freeze', () => __life.push('freeze')); document.addEventListener('resume', () => __life.push('resume')); true" });
-    await evalApp(`return ac.webviews.get("${other.id}")?.setFrozen(true)`);
-    await sleep(1500);
-    await evalApp(`return ac.webviews.get("${other.id}")?.setFrozen(false)`);
-    const life = await until("freeze and resume", async () => {
-      const r = await cdp(t, "Runtime.evaluate", { expression: "JSON.stringify(window.__life)", returnByValue: true });
-      const l = JSON.parse(r.result.value ?? "[]");
-      return l.includes("freeze") && l.includes("resume") ? l : null;
-    }, 8000);
-    return { life };
+    const other = await openTab(`${base}/d?freeze`, "Page D");
+    try {
+      const t = await pageFor(other.id, `${base}/d?freeze`);
+      await backToA();
+      await until("the freeze fixture to be hidden", async () =>
+        (await cdp(t, "Runtime.evaluate", { expression: "document.visibilityState", returnByValue: true })).result.value === "hidden");
+      await cdp(t, "Runtime.evaluate", { expression: "window.__life = []; document.addEventListener('freeze', () => __life.push('freeze')); document.addEventListener('resume', () => __life.push('resume')); true" });
+      await evalApp(`return ac.webviews.get("${other.id}").setFrozen(true)`);
+      await sleep(1500);
+      await evalApp(`return ac.webviews.get("${other.id}").setFrozen(false)`);
+      const life = await until("freeze and resume", async () => {
+        const r = await cdp(t, "Runtime.evaluate", { expression: "JSON.stringify(window.__life)", returnByValue: true });
+        const l = JSON.parse(r.result.value ?? "[]");
+        return l.includes("freeze") && l.includes("resume") ? l : null;
+      }, 8000);
+      return { life };
+    } finally {
+      await closeTab(other.id);
+    }
   });
 
   await check("discard", async () => {
