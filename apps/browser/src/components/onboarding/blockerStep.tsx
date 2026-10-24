@@ -3,7 +3,7 @@ import { Symbol } from "@ardia/shell";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { applyOnboardingBlocker } from "../../lib/contentBlockerOnboarding";
-import { PROVIDER_TITLES, runningProviderText, runningStatus } from "../../lib/contentBlockerProvider";
+import { PROVIDER_TITLES, providerStatusText, runningStatus } from "../../lib/contentBlockerProvider";
 import { getActivatingBlocker, onBlockerSettingsChange } from "../../lib/contentBlockerSelection";
 import { AdNauseamPreview } from "./adnauseamPreview";
 import { StepLayout } from "./steps";
@@ -38,7 +38,11 @@ export function BlockerStep() {
     setLoadError("");
     getContentBlocker().then(
       (s) => alive.current && id === request.current && setBlocker(s),
-      (e) => alive.current && id === request.current && setLoadError(message(e)),
+      (e) => {
+        if (!alive.current || id !== request.current) return;
+        setBlocker(null);
+        setLoadError(message(e));
+      },
     );
   };
 
@@ -96,7 +100,8 @@ export function BlockerStep() {
     ? `Couldn't check the ad blocker: ${loadError}. Try again, or keep the one you have.`
     : !blocker
       ? "Checking which ad blocker is running…"
-      : runningStatus(blocker) !== "running" ? runningProviderText(blocker) : "";
+      : blocker.provider !== blocker.selectedProvider || runningStatus(blocker) !== "running"
+        ? providerStatusText(blocker, "Continue to retry.") : "";
 
   return (
     <StepLayout

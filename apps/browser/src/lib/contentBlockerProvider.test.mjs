@@ -32,4 +32,8 @@ test("doesn't call a blocker running while it's off, starting or failed", () => 
 
 test("onboarding describes activation on Continue", () => {
   assert.equal(switchOnContinueText("adnauseam"), "AdNauseam activates when you continue. No restart needed.");
+  assert.equal(
+    providerStatusText(state({ selectedProvider: "adnauseam" }), "Continue to retry."),
+    "uBlock Origin 1.65.0 is running. AdNauseam could not be activated. Continue to retry.",
+  );
 });

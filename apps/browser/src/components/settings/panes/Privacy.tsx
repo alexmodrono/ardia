@@ -128,7 +128,7 @@ export function PrivacyPane() {
           </Row>
         )}
         {adNauseam ? (
-          <Row anchor="privacy.blockAds" title="Protection active" description="Pausing protection also pauses background ad clicking.">
+          <Row anchor="privacy.blockAds" title={blocker?.enabled ? "Protection active" : "Protection paused"} description="Pausing protection also pauses background ad clicking.">
             <Toggle value={!!blocker?.enabled} disabled={busy} onChange={(v) => void toggleBlocking(v)} />
           </Row>
         ) : (

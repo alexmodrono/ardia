@@ -24,8 +24,8 @@ export const format = (template, args) => {
 
 export const scriptWith = (template, args) => format(template, args.map((a) => JSON.stringify(a)));
 
-export const extensionOrigin = "chrome-extension://kmggppiioddbnikpjfodfabgmboeihij";
-export const offDirective = "/^(?:ardia-blocking-off|)/";
+export const extensionOrigin = `chrome-extension://${nativeString("kAdNauseamId")}`;
+export const offDirective = nativeString("kOffDirective");
 
 export function runOnPage(script, { background, send = () => Promise.reject(new Error("send isn't available")), storage = {} }) {
   return new Promise((resolve) => {

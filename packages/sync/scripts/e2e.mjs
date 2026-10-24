@@ -358,7 +358,8 @@ try {
   await sync("C", "C", "A", "B", "C");
   await until("three devices to converge", async () => {
     const [a, b, c] = await Promise.all([state("A"), state("B"), state("C")]);
-    return same(a, b) && same(a, c) && a.devices.length === 3;
+    const devices = text([a.deviceId, b.deviceId, c.deviceId].sort());
+    return same(a, b) && same(a, c) && [a, b, c].every(peer => text([...peer.devices].sort()) === devices);
   }, ["A", "B", "C"]);
   const c = await state("C");
   a = await state("A");

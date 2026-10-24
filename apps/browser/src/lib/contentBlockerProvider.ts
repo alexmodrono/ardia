@@ -20,7 +20,7 @@ export function runningProviderText(s: ContentBlockerState) {
 
 export const switchOnContinueText = (provider: ContentBlockerProvider) => `${PROVIDER_TITLES[provider]} activates when you continue. No restart needed.`;
 
-export const providerStatusText = (s: ContentBlockerState) =>
+export const providerStatusText = (s: ContentBlockerState, retry = "Select it again to retry.") =>
   s.selectedProvider !== s.provider
-    ? `${runningProviderText(s)} ${PROVIDER_TITLES[s.selectedProvider]} could not be activated. Select it again to retry.`
+    ? `${runningProviderText(s)} ${PROVIDER_TITLES[s.selectedProvider]} could not be activated. ${retry}`
     : runningProviderText(s);

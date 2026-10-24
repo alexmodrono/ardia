@@ -19,6 +19,17 @@ const dashboard = ({ whitelist = [], userSettings } = {}) => (message) => {
   return Promise.reject(new Error(`unexpected ${message.what}`));
 };
 
+async function waitForReply(reply, granting) {
+  let settled = false;
+  granting.then(() => { settled = true; }, () => { settled = true; });
+  const deadline = Date.now() + 1000;
+  while (!reply()) {
+    assert.ok(!settled, "the grant finished before reaching the deferred dashboard reply");
+    assert.ok(Date.now() < deadline, "the grant did not reach the deferred dashboard reply within one second");
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+
 test("revoking stops the switch without readiness, the whitelist or the dashboard", async () => {
   const b = background({ ardiaClickConsent: true, µBlock: {} });
   const result = await runOnPage(revoke(1), { background: b });
@@ -42,7 +53,7 @@ test("a grant whose dashboard answer arrives after a revoke leaves clicking off"
     background: b,
     send: dashboard({ userSettings: () => new Promise((resolve) => (answer = resolve)) }),
   });
-  while (!answer) await new Promise((r) => setImmediate(r));
+  await waitForReply(() => answer, granting);
   await runOnPage(revoke(1), { background: b });
   answer({});
   assert.deepEqual(await granting, { value: null });
@@ -65,7 +76,7 @@ test("a grant waiting on the whitelist cannot cross a background reload after re
       ? new Promise((resolve) => { answer = resolve; })
       : Promise.resolve({}),
   });
-  while (!answer) await new Promise((r) => setImmediate(r));
+  await waitForReply(() => answer, granting);
   await runOnPage(revoke(2), { background: b });
   b = background();
   answer({ whitelist: [] });
@@ -81,7 +92,7 @@ test("a grant's delayed settings answer cannot enable a replacement document in 
     background: b,
     send: dashboard({ userSettings: () => new Promise((resolve) => { answer = resolve; }) }),
   });
-  while (!answer) await new Promise((r) => setImmediate(r));
+  await waitForReply(() => answer, granting);
   await runOnPage(revoke(2), { background: b });
   Object.assign(b, background());
   delete b.ardiaClickToken;
@@ -120,7 +131,7 @@ test("a revoke arriving late never lowers the token, so the pending grant before
     background: b,
     send: dashboard({ userSettings: () => new Promise((resolve) => (answer = resolve)) }),
   });
-  while (!answer) await new Promise((r) => setImmediate(r));
+  await waitForReply(() => answer, granting);
   await runOnPage(revoke(2), { background: b });
   await runOnPage(revoke(1), { background: b });
   answer({});

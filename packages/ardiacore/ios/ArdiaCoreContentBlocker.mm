@@ -22,7 +22,10 @@ NSDictionary *Preferences() {
   return [saved isKindOfClass:NSDictionary.class] ? saved : @{};
 }
 
+NSString *gSelectedProviderOverride;
+
 NSString *SelectedProvider() {
+  if (gSelectedProviderOverride) return gSelectedProviderOverride;
   NSDictionary *saved = Preferences();
   return [saved[@"provider"] isEqual:kAdNauseam] && [saved[@"clickAds"] isEqual:@YES] ? kAdNauseam : kUBlock;
 }
@@ -38,7 +41,9 @@ bool ClickConsent() {
 
 NSString *SavePreferences(NSString *provider, bool clickAds) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:@{@"provider" : provider, @"clickAds" : @(clickAds)} options:0 error:nil];
-  return [data writeToFile:PreferencesPath() atomically:YES] ? nil : @"couldn't save the content blocker's settings";
+  if (![data writeToFile:PreferencesPath() atomically:YES]) return @"couldn't save the content blocker's settings";
+  gSelectedProviderOverride = nil;
+  return nil;
 }
 
 NSString *gProvider = kUBlock;
@@ -248,7 +253,12 @@ void StartPreparing() {
     NSString *selected = SelectedProvider();
     gExtensionPath = BundledExtension(selected);
     if (gExtensionPath) gProvider = selected;
-    else if (![selected isEqual:kUBlock]) gExtensionPath = BundledExtension(kUBlock);
+    else if (![selected isEqual:kUBlock]) {
+      gExtensionPath = BundledExtension(kUBlock);
+      gSelectedProviderOverride = kUBlock;
+      gClickConsent = @NO;
+      if (NSString *error = SavePreferences(kUBlock, false)) NSLog(@"[blocker] unavailable provider fallback: %@", error);
+    }
     NSString *oldCopies = [[ArdiaCoreHost.dataDirectory stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Built-in Extensions"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
       if ([NSFileManager.defaultManager fileExistsAtPath:oldCopies]) [NSFileManager.defaultManager removeItemAtPath:oldCopies error:nil];
