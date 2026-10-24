@@ -72,10 +72,9 @@ EngineCallbacks& Callbacks() {
 bool g_browser_started = false;
 
 constexpr char kBundledContentBlockerId[] = "fajbdaomknpkicfjcpipdmcpoamdmilh";
-constexpr char kBundledAdNauseamId[] = "kmggppiioddbnikpjfodfabgmboeihij";
 
 bool IsBundledComponentExtension(const extensions::ExtensionId& extension_id) {
-  return extension_id == kBundledContentBlockerId || extension_id == kBundledAdNauseamId;
+  return extension_id == kBundledContentBlockerId;
 }
 
 constexpr const char* kSwitchesThatOpenTheProfile[] = {

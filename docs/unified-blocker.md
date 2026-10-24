@@ -48,7 +48,10 @@ These require the additional engine patch and a matching local framework.
 ## Checks
 
 ```sh
-npm --prefix ../ardia-unified-blocker/ardia run check
+bash packages/ardiacore/scripts/unified-blocker.sh
+blocker_commit=$(python3 -c 'import json; print(json.load(open("packages/ardiacore/blocker-source.json"))["commit"])')
+blocker_source="${ARDIA_BLOCKER_SOURCE:-packages/ardiacore/vendor/unified-blocker/source/$blocker_commit}"
+npm --prefix "$blocker_source/ardia" run check
 pnpm --filter @ardia/browser typecheck
 pnpm --filter @ardia/browser test
 pnpm --filter @ardia/ardiacore test
