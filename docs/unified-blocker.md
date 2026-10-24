@@ -78,11 +78,26 @@ Release JavaScript, so Metro and its Refreshing banner are not involved.
 
 ## Validation scope
 
-The draft PR records checks against its rebased tip. The additional engine changes
+The draft PR distinguishes current checks from historical native validation. The additional engine changes
 require a matching engine prebuilt and corresponding source archive for a release.
 No engine prebuilt or browser release is published by this PR.
 
-## Draft validation on the current onboarding
+## Validation after the upstream onboarding refresh
+
+Browser base `4d6b5c9b8424b6bb1b8b117b43c6f33038d7e09c`, with the same source
+fork pin `e378fb9143ea905d84e26ada37a48665687c7335`:
+
+- Root `pnpm typecheck` and `pnpm test` pass, including three navigation/resume regressions.
+- The web demo builds and all 279 app symbols have web artwork.
+- The rendered onboarding passes search → protection → pins navigation, cancelled
+  and accepted consent, Back, Standard revocation, and recap updates in headless
+  Chromium with a stubbed native blocker bridge. This does not validate native execution.
+- The engine series reproduces 278 touched paths in 63 steps in an isolated reconstruction.
+
+The native app build and native runtime checks below have not been rerun after
+this refresh. Native API 17 distinguishes this combination from earlier demo builds.
+
+## Historical native validation before the upstream refresh
 
 Validated against browser base `4e8b88eadc9ca051ba21de282c8509a8e34be39b`
 and source fork `e378fb9143ea905d84e26ada37a48665687c7335`:
@@ -100,7 +115,7 @@ and source fork `e378fb9143ea905d84e26ada37a48665687c7335`:
 - The public source fetch/build succeeds without a sibling checkout. The fork's
   26 tests and updater validation against its current upstream tag pass.
 
-Fresh isolated-profile captures of the current onboarding:
+Isolated-profile native captures from that pre-refresh validation:
 
 ![Standard selected by default](images/unified-blocker/onboarding-standard.png)
 ![Active obfuscation explanation before consent](images/unified-blocker/onboarding-active.png)

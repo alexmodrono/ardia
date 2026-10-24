@@ -329,7 +329,7 @@ export function CheckRow({
   const { hovered, hoverProps } = useHover();
   return (
     <View {...hoverProps} style={{ opacity: disabled ? 0.5 : 1 }}>
-      <Pressable disabled={disabled} onPress={() => onChange(!value)} accessibilityRole={role} accessibilityState={role === "radio" ? { selected: value, disabled } : { checked: value, disabled }} accessibilityLabel={title}>
+      <Pressable disabled={disabled} onPress={() => onChange(!value)} accessibilityRole={role} accessibilityState={{ checked: value, disabled }} aria-checked={value} accessibilityLabel={title}>
         <RowFrame hovered={hovered} disabled={disabled} compact={compact}>
           {icon ? (
             <View mouseDownCanMoveWindow={false} style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: colors.iconContainer, alignItems: "center", justifyContent: "center" }}>
