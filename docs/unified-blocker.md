@@ -106,7 +106,7 @@ combination of upstream engine selection and the unified privacy bridge.
   live Standard revocation, site pause/resume, measured GPC/tracker probes, tagged
   navigation, and display reset without deleting the vault.
 - Broad Debug acceptance initially passed 141/145 checks. All four failures pass
-  in focused reruns after fixing duplicate engine events and two test races: an
+  in focused reruns after fixing duplicate engine events and two test timing issues: an
   uncached remote filter-list toggle and a click before the PiP popover settled.
   The affected permission/download rerun passes 9 checks; the final settings/PiP
   rerun passes all 5, including native PiP window controls.
@@ -114,6 +114,28 @@ combination of upstream engine selection and the unified privacy bridge.
 - Engine permission and download events are routed by their existing IDs so the
   shared macOS event bus delivers each event once, including when both engine
   modules are present. Six regression cases cover shared and separate buses.
+
+The performance ceilings are **not green**. The Node operation-count check is
+15 operations over its existing `groupLabel.500.afterMemberTitle` ceiling
+(14,903 versus 14,888); all 17 counts exactly match unchanged `main`.
+The JavaScript ratchet repeats both large and small sessions and reports 44
+counts over their stored ceilings. The same 44 exceed their ceilings with the
+upstream UI from `53ef1bc9`, on the same native app/framework (only its native-API
+guard is adapted from 16 to 18). No new ceiling category fails in this PR, but
+its added UI has measurable cost: one extra launch mount, 13 extra mounts across
+13 tab switches, 102 extra selector calls and 50 extra subscriber notifications
+in that switching scenario. Typing and hover render counts match the control.
+These count comparisons do not establish native timing parity or the cost of
+Active obfuscation on real websites. Existing ceilings are unchanged.
+
+A local native benchmark completes three launches and one full session (1, 10
+and 20 tabs, two 60-second idle windows, tab switching, new tabs/windows, and
+memory after closing tabs). No paint samples are excluded. Observed medians are
+374 ms to a window with content, 11 ms to show a switched tab, and 83 ms to a new
+tab's first paint. These are diagnostic measurements of a local Release build,
+without an interleaved stable control. The idle windows record 52 seconds of
+user input elsewhere on the Mac, so their CPU figures are not a quiet-machine
+comparison. This does not qualify a release or establish performance parity.
 
 Runtime checks use isolated profiles. Synthetic ad visits are intercepted locally;
 none reach advertising services. The [recording page instructions](../packages/ardiacore/scripts/protection-demo/README.md)
