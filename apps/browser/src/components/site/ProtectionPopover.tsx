@@ -99,7 +99,23 @@ function ProtectionPanel({ tabId, closing, onClosed, ...position }: { tabId: str
   const [blocker, setBlocker] = useState<ContentBlockerState | null>(null);
   const [changing, setChanging] = useState(false);
   const [error, setError] = useState("");
-  const blocked = usePage(tabId, p => p.blocked);
+  const [blocked, setBlocked] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      let count: number | null = null;
+      try {
+        const stats = await webviews.get(tabId)?.getContentBlockerStats();
+        if (stats?.url === tab.url && typeof stats.blocked === "number") count = stats.blocked;
+      } catch {}
+      if (!live) return;
+      setBlocked(count);
+      timer = setTimeout(poll, 2000);
+    };
+    if (!closing) void poll();
+    return () => { live = false; clearTimeout(timer); };
+  }, [tabId, tab.url, closing]);
   const security = usePage(tabId, p => p.security);
   const close = () => setPopover(tabId, null);
   useEffect(() => {
@@ -141,7 +157,7 @@ function ProtectionPanel({ tabId, closing, onClosed, ...position }: { tabId: str
     </View>
     <PopoverRow title={status} detail={ready ? "Blocking can be paused if this site breaks" : "Waiting for the blocker to report its state"} accessory={<Toggle label="Block ads and trackers on this site" value={on} disabled={!ready || !blocker?.enabled || busy || privateTab} onChange={v => void toggleBlocking(v)} />} />
     <View style={{ margin: 12, marginTop: 8, gap: 8 }}>
-      <Metric wide value={ready ? blocked : null} title="Ads & trackers blocked" detail="Network requests · this page load" />
+      <Metric wide value={ready ? blocked : null} title="Ads & trackers blocked" detail="Requests blocked or safely replaced this page load. Hidden elements and script-based filtering are not counted." />
       {privateTab ? <Text style={{ fontSize: 12, color: theme.textSecondary, padding: 8 }}>{clicking}</Text> : <>
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Metric value={activity?.collected ?? null} title="Ads collected" detail="Saved for this site" />

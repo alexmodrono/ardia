@@ -59,6 +59,8 @@ pnpm --filter @ardia/ardiacore test
 scripts/agent/build-app --as unified --config Release --force
 node packages/ardiacore/scripts/unified-blocker-test.mjs \
   apps/browser/build-unified/Build/Products/Release/Ardia.app
+node packages/ardiacore/scripts/blocker-counters-test.mjs \
+  apps/browser/build-unified/Build/Products/Release/Ardia.app
 node packages/ardiacore/scripts/privacy-test.mjs \
   apps/browser/build-unified/Build/Products/Release/Ardia.app
 ```
@@ -81,8 +83,8 @@ Release JavaScript, so Metro and its Refreshing banner are not involved.
 
 Validated on October 25, 2026, against browser base
 `53ef1bc9c6290f601e9330e60f4def3813d0bfda` and source fork
-`e378fb9143ea905d84e26ada37a48665687c7335`. Native API 18 identifies this
-combination of upstream engine selection and the unified privacy bridge.
+`e378fb9143ea905d84e26ada37a48665687c7335`. Native API 19 adds the per-tab blocker statistics bridge to this
+combination of upstream engine selection and unified privacy controls.
 
 - Root `pnpm typecheck` and `pnpm test` pass; the browser suite has one existing skip.
 - The web demo builds; all 278 app symbols have artwork. Rendered onboarding checks
@@ -152,3 +154,15 @@ These captures predate the current upstream onboarding refresh:
 
 ![Standard selected by default](images/unified-blocker/onboarding-standard.png)
 ![Active obfuscation explanation before consent](images/unified-blocker/onboarding-active.png)
+
+## Shield counter correction
+
+The October 25 real-site investigation reproduced AS filtering requests internally
+while the native failed-request counter remained zero. The shield now reads the
+blocker's count by the native extension tab ID, including safe resource
+replacements. It does not sum tabs by URL or estimate tracking from a site's
+reputation. The isolated counter acceptance checks blocked/replaced requests,
+identical URLs in separate tabs, private counters, rendered values, same-document
+navigation, full navigation resets, and filter-list access in Active mode.
+The rebuilt demo's AS tab reported eight filtered requests, matching its blocker
+page store. Counts vary by session, consent choices, mode and page activity.

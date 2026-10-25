@@ -1206,6 +1206,15 @@ void LoadContentBlocker(NSString *profile) {
 
 @implementation ArdiaCoreContentBlocker
 
++ (void)pageStats:(NSString *)profile tabId:(int)tabId completion:(ArdiaCoreResult)completion {
+  NSString *script = ScriptWith(@"(() => { const b = chrome.extension.getBackgroundPage().µBlock;"
+                                " const p = b.readyToFilter && b.pageStoreFromTabId(%@);"
+                                " return p ? {url:p.rawURL,blocked:p.counts.blocked.any} : {}; })()", @[ @(tabId) ]);
+  Call(ardiacore_host::OriginalProfileName(profile), script, ^(id state, NSString *error) {
+    completion(!error && [state isKindOfClass:NSDictionary.class] ? state : @{});
+  });
+}
+
 + (void)privacyState:(NSString *)profile origin:(NSString *)origin completion:(ArdiaCoreResult)completion {
   Call(profile, ScriptWith(@"chrome.extension.getBackgroundPage().ardiaPrivacy.state(%@)", @[ origin ]), ^(id state, NSString *error) {
     if (error || ![state isKindOfClass:NSDictionary.class]) return completion(@{@"error": error ?: @"Privacy controls are unavailable."});

@@ -303,6 +303,9 @@ public class CefModule: Module {
       }.runOnQueue(.main)
       AsyncFunction("exitPictureInPicture") { (view: CefWebView) in view.browser.exitPictureInPicture() }.runOnQueue(.main)
 
+      AsyncFunction("getContentBlockerStats") { (view: CefWebView, promise: Promise) in
+        view.browser.contentBlockerStats { promise.resolve($0) }
+      }.runOnQueue(.main)
       AsyncFunction("getSecurityInfo") { (view: CefWebView, promise: Promise) in
         view.browser.securityInfo { promise.resolve($0) }
       }.runOnQueue(.main)

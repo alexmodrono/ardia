@@ -171,11 +171,9 @@ export function PrivacyPane() {
             if (windowId) state.newTab(windowId, { url: "chrome-extension://fajbdaomknpkicfjcpipdmcpoamdmilh/dashboard.html#options.html" });
           }} />
         </Row>
-        {!adNauseam && (
-          <Row anchor="privacy.filterLists">
-            <Button title="Advanced…" disabled={!blocker || busy} onPress={() => showSettingsSheet(<FilterListsSheet />)} />
-          </Row>
-        )}
+        <Row anchor="privacy.filterLists" title="Filter lists" description="Add regional lists for the languages you browse. Cookie banners and other annoyances have separate optional lists. Applies to both modes.">
+          <Button title="Manage…" disabled={!blocker || busy} onPress={() => showSettingsSheet(<FilterListsSheet />)} />
+        </Row>
       </Group>
       {!!shownError && <Text style={{ marginTop: 6, fontSize: 11.5, color: theme.textSecondary }}>{`Content blocker: ${shownError}`}</Text>}
 

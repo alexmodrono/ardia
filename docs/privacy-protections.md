@@ -85,19 +85,27 @@ shipping it.
 The shield beside the address appears while hovering the URL bar or while its
 popover is open. It is empty when blocking is paused, unavailable, or disabled for
 the site, and filled while protection is running. It opens a compact site panel. Its ads-and-trackers
-count is the existing combined network-request count for the current page load,
-not a count of unique companies or a guessed split between ads and trackers.
+count comes from uBlock's page store for the native extension tab ID. It includes
+blocked requests and requests replaced with harmless local resources, which the
+browser's failed-request events miss. It is scoped to the current page load, not
+unique companies, hidden elements, or script-based filtering. Different browsers
+use different counting rules; zero is not proof that nothing was hidden. The
+bridge rejects stale navigation responses and reports unavailable data as a dash.
 Collected ads and ads clicked are derived from this profile's saved Ad Vault
 entries for the registrable site, including subdomains. Only positive successful
 visit timestamps count as clicked; failures and attempts do not. Saved counts
 remain when Standard stops new collection and clicks, and deleting vault entries
 reduces those totals. The panel adds no independent history store.
 
-Activity refreshes every two seconds while the panel is mounted. Navigating to
+Request counts and activity refresh every two seconds while the panel is mounted. Navigating to
 another page resets its loaded state. Private tabs show blocking and protection
 status without exposing normal-profile ad history or an Ad Vault shortcut. The
 panel also exposes connection security, GPC, link-cleaning and CNAME exceptions,
 and the opt-in forget setting. Unavailable state is shown explicitly.
+
+Filter lists are available from Settings → Privacy → Filter lists in both modes.
+Regional lists can improve coverage on local-language sites; cookie-banner and
+annoyance lists remain optional to preserve compatibility.
 
 ## Recording a demonstration
 
