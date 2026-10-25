@@ -1,8 +1,9 @@
 # Unified blocker development
 
-This draft proposes replacing PR #124 with one Ardia Blocker component. The
-source fork is https://github.com/alexmodrono/ardia-blocker; PR #124 remains open
-until the maintainer agrees on the replacement.
+This draft supersedes the two-extension implementation in PR #124, which was
+closed on October 24, 2026. It proposes one Ardia Blocker component, with source
+at https://github.com/alexmodrono/ardia-blocker. The architecture and maintenance
+plan remain subject to maintainer review.
 
 The build fetches the exact source commit in `packages/ardiacore/blocker-source.json`
 into the ignored vendor cache, verifies its clean checkout, builds it and stages
@@ -76,46 +77,56 @@ explicit bundle path with a fresh `ARDIA_DATA_DIR`. Never copy it over the insta
 browser or use a personal browser profile. The interactive demo uses embedded
 Release JavaScript, so Metro and its Refreshing banner are not involved.
 
-## Validation scope
+## Validation on the current upstream base
 
-The draft PR distinguishes current checks from historical native validation. The additional engine changes
-require a matching engine prebuilt and corresponding source archive for a release.
-No engine prebuilt or browser release is published by this PR.
-
-## Validation after the upstream onboarding refresh
-
-Browser base `4d6b5c9b8424b6bb1b8b117b43c6f33038d7e09c`, with the same source
-fork pin `e378fb9143ea905d84e26ada37a48665687c7335`:
-
-- Root `pnpm typecheck` and `pnpm test` pass, including three navigation/resume regressions.
-- The web demo builds and all 279 app symbols have web artwork.
-- The rendered onboarding passes search → protection → pins navigation, cancelled
-  and accepted consent, Back, Standard revocation, and recap updates in headless
-  Chromium with a stubbed native blocker bridge. This does not validate native execution.
-- The engine series reproduces 278 touched paths in 63 steps in an isolated reconstruction.
-
-The native app build and native runtime checks below have not been rerun after
-this refresh. Native API 17 distinguishes this combination from earlier demo builds.
-
-## Historical native validation before the upstream refresh
-
-Validated against browser base `4e8b88eadc9ca051ba21de282c8509a8e34be39b`
-and source fork `e378fb9143ea905d84e26ada37a48665687c7335`:
+Validated on October 25, 2026, against browser base
+`53ef1bc9c6290f601e9330e60f4def3813d0bfda` and source fork
+`e378fb9143ea905d84e26ada37a48665687c7335`. Native API 18 identifies this
+combination of upstream engine selection and the unified privacy bridge.
 
 - Root `pnpm typecheck` and `pnpm test` pass; the browser suite has one existing skip.
-- The Release app builds with the locally compiled privacy framework.
-- Unified runtime checks: 17 pass, including Search and privacy → protection → pinned apps.
-- Privacy runtime checks: 13 pass; per-site pause/resume: 4 pass.
-- Profile switching and failure recovery: 3 pass.
-- Seven focused native blocker acceptance cases pass, including restore and provider switching.
-  Set `ARDIA_ACCEPTANCE_JS=none` for embedded Release JavaScript; those restart checks
-  require graceful termination instead of the Debug-only keyboard hook.
-- The engine series check passes for 62 steps and 277 touched paths against an
-  isolated reconstruction of the Helium base with the new files captured before patching.
-- The public source fetch/build succeeds without a sibling checkout. The fork's
-  26 tests and updater validation against its current upstream tag pass.
+- The web demo builds; all 278 app symbols have artwork. Rendered onboarding checks
+  cover search → protection → pins, cancelled and accepted consent, Back, Standard
+  revocation, and recap updates. That web test uses a stubbed native bridge.
+- The engine series applies in 63 steps and reproduces all 278 touched paths of
+  the local Chromium tree. The incremental rebuild compiles 69 translation units
+  from the generated Ninja commands, regenerates extension permissions, and links
+  the framework. Existing Chromium objects are reused. No build-cache cleanup or
+  source sync is performed. The ordinary build driver requested a broad rebuild
+  because earlier generated dependencies were newer than cached objects; this
+  local validation uses the explicit incremental build instead.
+- Release and Debug apps build with that refreshed framework.
+- Unified native runtime: 18 checks pass, including current onboarding and actual
+  Chromium → WebKit → Chromium switching. WebKit shows no Chromium protection
+  panel; switching back restores it.
+- Additional privacy: 13 checks pass. Site pause/resume: 4 checks pass, including
+  cancellation of an intercepted visit and restored hiding, collection and visits.
+- Two-profile switching and injected failure recovery: 3 checks pass.
+- The interactive recording page passes real collection and intercepted visits,
+  live Standard revocation, site pause/resume, measured GPC/tracker probes, tagged
+  navigation, and display reset without deleting the vault.
+- Broad Debug acceptance initially passed 141/145 checks. All four failures pass
+  in focused reruns after fixing duplicate engine events and two test races: an
+  uncached remote filter-list toggle and a click before the PiP popover settled.
+  The affected permission/download rerun passes 9 checks; the final settings/PiP
+  rerun passes all 5, including native PiP window controls.
+- The pinned public fork builds and its 26 checks pass.
+- Engine permission and download events are routed by their existing IDs so the
+  shared macOS event bus delivers each event once, including when both engine
+  modules are present. Six regression cases cover shared and separate buses.
 
-Isolated-profile native captures from that pre-refresh validation:
+Runtime checks use isolated profiles. Synthetic ad visits are intercepted locally;
+none reach advertising services. The [recording page instructions](../packages/ardiacore/scripts/protection-demo/README.md)
+explain how to reproduce the interactive demonstration.
+
+This remains a draft for the maintainer's architecture and maintenance review.
+An eventual release needs a matching engine prebuilt and corresponding source
+archive, plus the stable release's compatibility and performance qualification.
+This PR publishes neither an engine prebuilt nor a browser release.
+
+## Earlier onboarding captures
+
+These captures predate the current upstream onboarding refresh:
 
 ![Standard selected by default](images/unified-blocker/onboarding-standard.png)
 ![Active obfuscation explanation before consent](images/unified-blocker/onboarding-active.png)

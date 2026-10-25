@@ -8,6 +8,7 @@ import { usePrivacySettings } from "../../lib/privacySettings";
 import { useTheme } from "../../lib/theme";
 import { webviews } from "../../lib/webviews";
 import { useBrowser } from "../../store/browser";
+import { tabEngine } from "../../store/engines";
 import { useTab } from "../../store/hooks";
 import { engineProfile, incognitoOriginal, isIncognitoProfile } from "../../store/model";
 import { PanelCloseButton, Popover, PopoverRow, PopoverSeparator, PromptButton, Toggle, ToolbarButton, usePopoverPresence } from "../layout/controls";
@@ -17,7 +18,14 @@ import { openSettings } from "../settings/windows";
 
 export const PROTECTION_WIDTH = 340;
 
-export function ProtectionButton({ tabId, open, palette, onFocus }: { tabId: string; open: boolean; palette: ToolbarPalette; onFocus: () => void }) {
+type ProtectionButtonProps = { tabId: string; open: boolean; palette: ToolbarPalette; onFocus: () => void };
+
+export function ProtectionButton(props: ProtectionButtonProps) {
+  const engine = useBrowser(s => tabEngine(s, props.tabId));
+  return engine === "chromium" ? <ChromiumProtectionButton {...props} /> : null;
+}
+
+function ChromiumProtectionButton({ tabId, open, palette, onFocus }: ProtectionButtonProps) {
   const tab = useTab(tabId);
   const url = tab?.url ?? "";
   const profileId = tab?.profileId ?? "";
@@ -48,9 +56,13 @@ export function ProtectionButton({ tabId, open, palette, onFocus }: { tabId: str
 
 
 export function ProtectionPopover({ tabId, open, ...position }: { tabId: string; open: boolean; right?: number; left?: number; top: number }) {
-  const presence = usePopoverPresence(open);
+  const engine = useBrowser(s => tabEngine(s, tabId));
+  const presence = usePopoverPresence(open && engine === "chromium");
   const tab = useTab(tabId);
-  if (!presence.shown || !tab || !/^https?:\/\//i.test(tab.url)) return null;
+  useEffect(() => {
+    if (open && engine !== "chromium") setPopover(tabId, null);
+  }, [engine, open, tabId]);
+  if (engine !== "chromium" || !presence.shown || !tab || !/^https?:\/\//i.test(tab.url)) return null;
   return <ProtectionPanel key={`${tab.id}:${tab.profileId}:${tab.url}`} tabId={tabId} {...position} closing={presence.closing} onClosed={presence.onClosed} />;
 }
 

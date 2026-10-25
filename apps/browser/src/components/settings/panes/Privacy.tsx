@@ -116,7 +116,7 @@ export function PrivacyPane() {
 
   return (
     <View>
-      <SectionHeader title="Content blocking" description="One engine, powered by uBlock Origin and AdNauseam. Standard blocks ads and trackers. Active obfuscation adds background visits intended to blur advertising profiles." />
+      <SectionHeader title="Content blocking" description="For pages opened in Chromium, powered by uBlock Origin and AdNauseam. Standard blocks ads and trackers. Active obfuscation adds background visits intended to blur advertising profiles." />
       <Group>
         {blocker && (blocker.availableProviders.length > 1 || (!blocker.stats.ready && !!blocker.stats.error)) && (
           <Row anchor="privacy.contentBlocker" title="Protection mode" description={activating ? `Activating ${PROVIDER_TITLES[activating]}…` : providerNote(blocker)}>

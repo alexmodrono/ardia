@@ -13,7 +13,7 @@ export function PrivacyProtections() {
   const [selected, select] = useState(() => useBrowser.getState().settings.defaultProfileId);
   const { state, busy, error, set } = usePrivacySettings(engineProfile(selected));
   return <View>
-    <SectionHeader title="Browsing privacy" description="Conservative protections for this profile. Open a site's controls for exceptions. Refresh open pages after changes." action={profiles.length > 1 ? <PopUp value={selected} options={profiles.map(p => ({ value: p.id, title: p.name }))} disabled={busy} onChange={select} /> : undefined} />
+    <SectionHeader title="Browsing privacy" description="These protections apply to Chromium pages in this profile. Open a site's controls for exceptions. Refresh open pages after changes." action={profiles.length > 1 ? <PopUp value={selected} options={profiles.map(p => ({ value: p.id, title: p.name }))} disabled={busy} onChange={select} /> : undefined} />
     <Group>
       <Row anchor="privacy.globalPrivacyControl" title="Global Privacy Control" description="Ask websites not to sell or share your personal data. This sends a preference; it does not itself block tracking.">
         <Toggle value={!!state?.globalPrivacyControl} disabled={!state || busy || state.managed} onChange={v => void set("globalPrivacyControl", v)} />

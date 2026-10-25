@@ -635,7 +635,9 @@ const startVideo = async (tabId, audio) => {
   return t;
 };
 const pipByHand = async (tabId) => {
+  await until("the PiP control ready", async () => (await live(tabId))?.hasVideo || (await lastEvent(tabId, "nowPlaying", p => p.state?.hasVideo)), 8000);
   await evalApp(`ac.pageState.setState((s) => ({ popover: { ...s.popover, ${JSON.stringify(tabId)}: "siteControls" } })); return true`);
+  await sleep(250);
   return until("a click on Site Controls › Picture in Picture", async () => {
     const click = await evalApp(`return ac.shell.devClick(${JSON.stringify(mainWindow)}, { label: "Picture in Picture", queued: true, wait: 300 })`);
     return click?.error ? null : click;
@@ -2933,19 +2935,24 @@ try {
       return r?.sound?.isDefault ? r.sound : null;
     });
     const before = await cef(`getContentBlocker()`);
-    await cef(`setContentBlockerEnabled(false)`);
-    const off = await until("the blocker off", async () => ((await cef(`getContentBlocker()`)).enabled === false ? true : null), 15000);
-    await cef(`setContentBlockerEnabled(true)`);
-    await until("the blocker on", async () => ((await cef(`getContentBlocker()`)).enabled === true ? true : null), 15000);
-    const list = before.lists.find((l) => !l.enabled) ?? before.lists[0];
-    await cef(`setFilterListEnabled(${JSON.stringify(list.id)}, ${!list.enabled})`);
-    const toggled = await until("the list toggled", async () =>
-      (await cef(`getContentBlocker()`)).lists.find((l) => l.id === list.id)?.enabled === !list.enabled ? true : null, 20000);
-    await cef(`setFilterListEnabled(${JSON.stringify(list.id)}, ${list.enabled})`);
-    await cef(`removeExternalAppAllowance("", "https://none.test", "ardiacore-no-such-app")`);
-    const siteData = await evalApp(`return ac.webviews.get("${first.id}")?.clearSiteData() ?? null`);
-    if (!siteData || siteData.error) throw new Error(`clearSiteData: ${JSON.stringify(siteData)}`);
-    return { reset: reset.value, blockerOff: off, list: list.id, toggled, siteData };
+    const list = before.lists.find((l) => l.enabled) ?? before.lists[0];
+    if (!list) throw new Error("No filter list is available to test");
+    try {
+      await cef(`setContentBlockerEnabled(false)`);
+      const off = await until("the blocker off", async () => ((await cef(`getContentBlocker()`)).enabled === false ? true : null), 15000);
+      await cef(`setContentBlockerEnabled(true)`);
+      await until("the blocker on", async () => ((await cef(`getContentBlocker()`)).enabled === true ? true : null), 15000);
+      await cef(`setFilterListEnabled(${JSON.stringify(list.id)}, ${!list.enabled})`);
+      const toggled = await until("the list toggled", async () =>
+        (await cef(`getContentBlocker()`)).lists.find((l) => l.id === list.id)?.enabled === !list.enabled ? true : null, 20000);
+      await cef(`removeExternalAppAllowance("", "https://none.test", "ardiacore-no-such-app")`);
+      const siteData = await evalApp(`return ac.webviews.get("${first.id}")?.clearSiteData() ?? null`);
+      if (!siteData || siteData.error) throw new Error(`clearSiteData: ${JSON.stringify(siteData)}`);
+      return { reset: reset.value, blockerOff: off, list: list.id, toggled, siteData };
+    } finally {
+      try { await cef(`setFilterListEnabled(${JSON.stringify(list.id)}, ${list.enabled})`); }
+      finally { await cef(`setContentBlockerEnabled(${before.enabled})`); }
+    }
   });
 
   await check("download-controls", async () => {
@@ -3217,7 +3224,8 @@ try {
       await evalApp(`return ac.webviews.get("${tab.id}").setMuted(true)`);
       const t = await startVideo(tab.id, false);
       const click = await pipByHand(tab.id);
-      const on = await until("onPictureInPicture video", async () => lastEvent(tab.id, "pictureInPicture", (p) => p.kind === "video" && p.active), 5000);
+      const on = await until("onPictureInPicture video", async () => lastEvent(tab.id, "pictureInPicture", (p) => p.kind === "video" && p.active), 5000)
+        .catch(error => { throw new Error(`${error.message}; click: ${JSON.stringify(click)}`); });
       const element = (await cdp(t, "Runtime.evaluate", { expression: "document.pictureInPictureElement?.id ?? null", returnByValue: true })).result.value;
       const video = await until("Chrome's PiP window, styled", async () => (await pipWindows())?.find((w) => w.video && w.styled) ?? null, 5000)
         .catch(async (e) => { throw new Error(`${e.message}: ${JSON.stringify(await pipWindows())}`); });

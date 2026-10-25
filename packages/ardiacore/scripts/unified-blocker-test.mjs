@@ -19,7 +19,10 @@ let app, background, page;
 const server = createServer((req, res) => {
   routes.push(req.url);
   res.setHeader('Cache-Control', 'no-store');
-  if (req.url === '/banner.svg') {
+  if (req.url === '/engine') {
+    res.setHeader('Content-Type', 'text/html');
+    res.end('<title>Engine switch fixture</title><h1>Normal content remains available</h1>');
+  } else if (req.url === '/banner.svg') {
     res.setHeader('Content-Type', 'image/svg+xml');
     res.end('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="250"><rect width="300" height="250" fill="blue"/><text x="20" y="80" fill="white">Local test ad</text></svg>');
   } else if (req.url.startsWith('/pagead/ads')) {
@@ -154,14 +157,15 @@ try {
   assert.deepEqual(standardPrivacy.activity, { collected: 1, clicked: 1 });
   record('returning to Standard stops obfuscation and retains the local vault');
 
-  await app.eval('ac.onboarding.startOnboarding("w1", "searchPrivacy"); ac.onboarding.useOnboarding.getState().setExtras({block:false}); return true;');
+  const listsBeforeOnboarding = (await state()).lists;
+  await app.eval('ac.onboarding.startOnboarding("w1", "searchPrivacy"); ac.onboarding.useOnboarding.getState().setExtras({share:false}); ac.onboarding.useOnboarding.getState().go("searchPrivacy", 2); return true;');
   await until('search privacy step', () => app.eval('return acPerf.findFibers("SearchPrivacyStep").length > 0;'));
   await sleep(300);
   await app.eval('return acPerf.findFibers("StepActions")[0].memoizedProps.onContinue();');
   assert.equal(await app.eval('return ac.onboarding.useOnboarding.getState().step;'), 'blocker');
-  const allowed = await state();
-  assert.equal(allowed.lists.some(list => ["ads", "trackers", "cookies"].includes(list.category) && list.enabled), false);
-  record('latest onboarding finishes category changes before entering the blocker step');
+  assert.deepEqual((await state()).lists, listsBeforeOnboarding);
+  assert.equal((await state()).clickAds, false);
+  record('latest onboarding advances from privacy questions to protection without changing filters or consent');
   await sleep(1000);
   const rows = await app.eval('return acPerf.findFibers("CheckRow").map(f=>({title:f.memoizedProps.title, selected:f.memoizedProps.value, role:f.memoizedProps.role}));');
   assert.ok(rows.some(r => r.title === 'Standard' && r.selected && r.role === 'radio'), JSON.stringify(rows));
@@ -194,6 +198,34 @@ try {
   assert.equal(await preferences.eval('getComputedStyle(document.querySelector("iframe").contentDocument.querySelector("#clickingAds").closest(".switch")).display'), 'none');
   record('full preferences load with Ardia owning the clicking mode');
 
+  const engineTab = await app.eval(`return ac.store.getState().newTab("w1", {url:${JSON.stringify(`http://127.0.0.1:${server.address().port}/engine`)}});`);
+  const showSiteControls = async () => {
+    await app.eval(`ac.pageState.setState(s=>({popover:{...s.popover,[${JSON.stringify(engineTab)}]:"siteControls"}}));return true;`);
+    await until('engine site controls', () => app.eval(`return acPerf.findFibers("SiteControlsPanel").some(f=>f.memoizedProps.tabId===${JSON.stringify(engineTab)});`));
+  };
+  const switchEngine = async title => {
+    await showSiteControls();
+    await app.eval('acPerf.findFibers("MoreButton")[0].memoizedProps.onPress(); return true;');
+    await until('engine switch action', () => app.eval(`return acPerf.findFibers("PopoverRow").some(f=>f.memoizedProps.title===${JSON.stringify(title)});`));
+    await app.eval(`acPerf.findFibers("PopoverRow").find(f=>f.memoizedProps.title===${JSON.stringify(title)}).memoizedProps.onPress(); return true;`);
+  };
+  await switchEngine('Open Page in WebKit');
+  await until('page switched to WebKit', () => app.eval(`return ac.store.getState().tabs[${JSON.stringify(engineTab)}]?.engine==="webkit";`));
+  await until('ordinary content in WebKit', () => app.eval(`return ac.webviews.get(${JSON.stringify(engineTab)})?.evaluate('post("result", JSON.stringify(document.querySelector("h1")?.textContent === "Normal content remains available"))');`));
+  await showSiteControls();
+  assert.equal(await app.eval('return acPerf.findFibers("SettingRow").some(f=>f.memoizedProps.title==="Privacy protections");'), false);
+  assert.ok(await app.eval('return acPerf.findFibers("SettingRow").some(f=>f.memoizedProps.title==="Block Ads & Trackers"&&f.memoizedProps.value==="Chromium only for now"&&!f.memoizedProps.onPress);'));
+  await app.eval(`ac.pageState.setState(s=>({popover:{...s.popover,[${JSON.stringify(engineTab)}]:"protection"}}));return true;`);
+  await sleep(500);
+  assert.equal(await app.eval(`return ac.pageState.getState().popover[${JSON.stringify(engineTab)}];`), null);
+  assert.equal(await app.eval('return acPerf.findFibers("ProtectionPanel").length;'), 0);
+  assert.equal(await app.eval('return acPerf.findFibers("ChromiumProtectionButton").length;'), 0);
+  await switchEngine('Open Page in Chromium');
+  await until('page switched to Chromium', () => app.eval(`return ac.store.getState().tabs[${JSON.stringify(engineTab)}]?.engine==="chromium";`));
+  await app.eval(`ac.pageState.setState(s=>({popover:{...s.popover,[${JSON.stringify(engineTab)}]:"protection"}}));return true;`);
+  await until('Chromium protections return', () => app.eval('return acPerf.findFibers("ProtectionPanel").length>0 && acPerf.findFibers("ChromiumProtectionButton").length>0;'));
+  await app.eval(`ac.pageState.setState(s=>({popover:{...s.popover,[${JSON.stringify(engineTab)}]:null}}));return true;`);
+  record('switching WebKit and Chromium hides unsupported protections and restores the shield');
 
   await cef('setContentBlockerProvider("adnauseam", true)');
   await app.eval('const profileId = ac.store.getState().createProfile({name:"Work"}); return ac.store.getState().createWindow({profileId});');

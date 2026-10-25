@@ -51,6 +51,10 @@ request blocking and enables GPC by default. `ac_privacy_settings` exposes only
 the relevant native preference; the extension receives no general browser-pref
 write API.
 
+These extension and native preference controls apply to pages opened in Chromium.
+WebKit pages use their own engine settings; the shield and Chromium privacy controls
+are hidden there. Switching the page back to Chromium restores them.
+
 ## Local validation
 
 The privacy acceptance script launches a hidden Release build with a temporary
@@ -94,3 +98,11 @@ another page resets its loaded state. Private tabs show blocking and protection
 status without exposing normal-profile ad history or an Ad Vault shortcut. The
 panel also exposes connection security, GPC, link-cleaning and CNAME exceptions,
 and the opt-in forget setting. Unavailable state is shown explicitly.
+
+## Recording a demonstration
+
+The [interactive protection demo](../packages/ardiacore/scripts/protection-demo/README.md)
+shows real sample-ad collection and completed, locally intercepted background visits.
+It also distinguishes measured GPC and tracker results from enabled settings that
+the page cannot verify. Standard continues to block ads while stopping new
+collection and visits; pausing site protection also makes the samples visible.
