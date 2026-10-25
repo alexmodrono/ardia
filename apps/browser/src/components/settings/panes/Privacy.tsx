@@ -133,12 +133,12 @@ export function PrivacyPane() {
         )}
         {adNauseam ? (
           <Row anchor="privacy.blockAds" title={blocker?.enabled ? "Protection active" : "Protection paused"} description="Pausing protection also pauses background ad clicking.">
-            <Toggle value={!!blocker?.enabled} disabled={busy} onChange={(v) => void toggleBlocking(v)} />
+            <Toggle label="Ad and tracker protection" value={!!blocker?.enabled} disabled={busy} onChange={(v) => void toggleBlocking(v)} />
           </Row>
         ) : (
           CATEGORIES.filter((c) => c.toggle).map((c) => (
             <Row key={c.id} anchor={c.anchor} title={c.toggle}>
-              <Toggle value={!!blocker && categoryOn(blocker, c.id)} disabled={!blocker || busy} onChange={(v) => void toggleCategory(c.id, v)} />
+              <Toggle label={c.toggle} value={!!blocker && categoryOn(blocker, c.id)} disabled={!blocker || busy} onChange={(v) => void toggleCategory(c.id, v)} />
             </Row>
           ))
         )}

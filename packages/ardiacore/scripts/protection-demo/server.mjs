@@ -25,7 +25,7 @@ const server = createServer(async (req, res) => {
   const json = value => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(value)); };
   if (path === 'state') return json({ ...status, sampledAt: status.sampledAt ?? null, offers, gpcHeader: req.headers['sec-gpc'] === '1' });
   if (path === 'offer' && req.method === 'POST') {
-    if (!status.connected || offers.length >= 120) { res.writeHead(409); return json({ error: 'Reconnect the demo, or start a new recording session after 120 ads.' }); }
+    if (!status.connected || offers.length >= 120) { res.statusCode = 409; return json({ error: 'Reconnect the demo, or start a new recording session after 120 ads.' }); }
     const id = offers.length + 1;
     const offer = { id, offeredAt: Date.now(), mode: status.blocker?.provider, blocking: status.privacy?.blocking, destination: 'https://' + host + '/visit?session=' + token + '&ad=' + id };
     offers.push(offer);

@@ -16,13 +16,13 @@ export function PrivacyProtections() {
     <SectionHeader title="Browsing privacy" description="These protections apply to Chromium pages in this profile. Open a site's controls for exceptions. Refresh open pages after changes." action={profiles.length > 1 ? <PopUp value={selected} options={profiles.map(p => ({ value: p.id, title: p.name }))} disabled={busy} onChange={select} /> : undefined} />
     <Group>
       <Row anchor="privacy.globalPrivacyControl" title="Global Privacy Control" description="Ask websites not to sell or share your personal data. This sends a preference; it does not itself block tracking.">
-        <Toggle value={!!state?.globalPrivacyControl} disabled={!state || busy || state.managed} onChange={v => void set("globalPrivacyControl", v)} />
+        <Toggle label="Global Privacy Control" value={!!state?.globalPrivacyControl} disabled={!state || busy || state.managed} onChange={v => void set("globalPrivacyControl", v)} />
       </Row>
       <Row anchor="privacy.cleanLinks" title="Clean navigation links" description="Clean known tracking tags when opening links. Known authentication, checkout and signed-link patterns, plus form submissions, are left alone. Site exceptions are available if a link fails.">
-        <Toggle value={!!state?.cleanLinks} disabled={!state || busy} onChange={v => void set("cleanLinks", v)} />
+        <Toggle label="Clean navigation links" value={!!state?.cleanLinks} disabled={!state || busy} onChange={v => void set("cleanLinks", v)} />
       </Row>
       <Row anchor="privacy.cname" title="Uncloak DNS aliases" description={state && !state.cnameAvailable ? "Unavailable with this engine build." : "Check DNS aliases against blocking rules. Uses the browser's DNS and proxy settings, preserves filter exceptions, and leaves the main page alone."}>
-        <Toggle value={!!state?.cname && !!state?.cnameAvailable} disabled={!state || busy || !state.cnameAvailable} onChange={v => void set("cname", v)} />
+        <Toggle label="Uncloak DNS aliases" value={!!state?.cname && !!state?.cnameAvailable} disabled={!state || busy || !state.cnameAvailable} onChange={v => void set("cname", v)} />
       </Row>
       <Row anchor="privacy.forgetSites" title="Forget selected sites after closing" description="Off unless you enable it in a site's controls. Clears its cookies and stored data after its last normal tab closes; this signs you out. Private tabs never trigger deletion in your normal profile." />
     </Group>

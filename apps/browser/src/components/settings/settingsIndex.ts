@@ -1,3 +1,4 @@
+import { PROVIDER_TITLES } from "../../lib/contentBlockerProvider";
 import { prepare, type Searchable } from "./searchMatch";
 import type { SettingsPane } from "./windows";
 
@@ -242,7 +243,7 @@ const ROWS: Record<SettingsPane, Section[]> = {
         blockAds: { title: "Block ads", keywords: ["ad blocker", "adblock", "ublock origin", "easylist"] },
         clickAds: {
           title: "Background ad clicking",
-          description: "Included with AdNauseam for active obfuscation. Choose uBlock Origin for blocking without clicking.",
+          description: `Included with ${PROVIDER_TITLES.adnauseam}. Choose ${PROVIDER_TITLES.ublock} for blocking without clicking.`,
           keywords: ["adnauseam", "ad clicks", "obfuscation"],
         },
         blockTrackers: { title: "Block trackers", keywords: ["tracking", "easyprivacy", "fingerprinting"] },
